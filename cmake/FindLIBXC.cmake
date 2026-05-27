@@ -1,0 +1,40 @@
+include(FindPackageHandleStandardArgs)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+
+if (DEFINED ENV{LIBXC_DIR})
+  set(LIBXC_DIR "$ENV{LIBXC_DIR}")
+endif()
+
+find_library(LIBXC_LIBRARY
+  NAMES xc
+  PATH_SUFFIXES lib
+  HINTS ${LIBXC_DIR}
+)
+
+find_library(LIBXCF03_LIBRARY
+  NAMES xcf03
+  PATH_SUFFIXES lib
+  HINTS ${LIBXC_DIR}
+)
+
+find_path(LIBXC_INCLUDE_DIR
+  NAMES xc.h
+  PATH_SUFFIXES include
+  HINTS ${LIBXC_DIR}
+)
+
+find_path(LIBXCF03_INCLUDE_DIR
+  NAMES xc_f03_funcs_m.mod
+  PATH_SUFFIXES include
+  HINTS ${LIBXC_DIR}
+)
+
+find_package_handle_standard_args(LIBXC
+  REQUIRED_VARS LIBXC_LIBRARY LIBXC_INCLUDE_DIR LIBXCF03_LIBRARY LIBXCF03_INCLUDE_DIR
+)
+
+mark_as_advanced(LIBXC_LIBRARY LIBXC_INCLUDE_DIR LIBXCF03_LIBRARY LIBXCF03_INCLUDE_DIR)
+if (NOT LIBXC_FOUND)
+  set(LIBXC_DIR "${LIBXC_DIR}" CACHE STRING "Directory containing the libxc library.")
+endif()

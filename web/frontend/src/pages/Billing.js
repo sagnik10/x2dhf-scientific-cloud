@@ -1,0 +1,18 @@
+import React from 'react';
+import {useMutation,useQuery} from 'react-query';
+import {billingAPI} from '../api/client';
+
+const items=response=>response?.data?.results||response?.data||[];
+
+const Billing=()=>{
+ const {data:invoiceResponse}=useQuery('invoices',billingAPI.getInvoices);
+ const {data:planResponse}=useQuery('pricing',billingAPI.getPricingPlans);
+ const {data:usageResponse}=useQuery('usage',billingAPI.getUsage);
+ const upgradeMutation=useMutation(plan=>billingAPI.upgradeSubscription(plan));
+ const invoices=items(invoiceResponse);
+ const plans=items(planResponse);
+ const usage=usageResponse?.data||{};
+ return(<div className="space-y-6 text-slate-100"><div><h1 className="text-4xl font-bold text-white">Billing</h1><p className="text-slate-400">Plan limits, usage, invoices, and SaaS account state.</p></div><div className="grid grid-cols-1 gap-4 md:grid-cols-4"><div className="rounded-lg border border-slate-800 bg-slate-950/80 p-5"><div className="text-sm uppercase text-slate-400">Computations</div><div className="mt-2 text-3xl font-bold text-cyan-100">{usage.computations_this_month||0}</div></div><div className="rounded-lg border border-slate-800 bg-slate-950/80 p-5"><div className="text-sm uppercase text-slate-400">Storage</div><div className="mt-2 text-3xl font-bold text-emerald-100">{Number(usage.storage_used_gb||0).toFixed(2)} GB</div></div><div className="rounded-lg border border-slate-800 bg-slate-950/80 p-5"><div className="text-sm uppercase text-slate-400">API Calls</div><div className="mt-2 text-3xl font-bold text-amber-100">{usage.api_calls_this_month||0}</div></div><div className="rounded-lg border border-slate-800 bg-slate-950/80 p-5"><div className="text-sm uppercase text-slate-400">GPU Hours</div><div className="mt-2 text-3xl font-bold text-rose-100">{Number(usage.gpu_hours_this_month||0).toFixed(2)}</div></div></div><section className="space-y-4"><h2 className="text-2xl font-bold text-white">Pricing Plans</h2><div className="grid grid-cols-1 gap-4 lg:grid-cols-3">{plans.length?plans.map(plan=><div key={plan.id} className="rounded-lg border border-slate-800 bg-slate-950/80 p-6 shadow-xl"><h3 className="text-xl font-bold text-white">{plan.name}</h3><p className="mt-2 text-3xl font-bold text-cyan-200">${plan.monthly_price}<span className="text-sm font-normal text-slate-400"> / month</span></p><ul className="mt-5 space-y-2 text-sm text-slate-300"><li>{plan.max_computations} computations per month</li><li>{plan.storage_gb} GB storage</li><li>{plan.max_api_calls} API calls per month</li><li>Grid size up to {plan.max_grid_size}</li><li>{plan.support_level} support</li></ul><button onClick={()=>upgradeMutation.mutate(plan.slug)} className="mt-6 w-full rounded-lg bg-cyan-400 px-4 py-2 font-semibold text-slate-950 hover:bg-cyan-300">Select Plan</button></div>):<div className="rounded-lg border border-slate-800 bg-slate-950/80 p-6 text-slate-400">No pricing plans have been configured yet.</div>}</div></section><section className="rounded-lg border border-slate-800 bg-slate-950/80 p-6 shadow-xl"><h2 className="mb-4 text-2xl font-bold text-white">Invoices</h2><div className="space-y-3">{invoices.length?invoices.map(inv=><div key={inv.id} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/60 p-4"><div><p className="font-semibold text-white">{inv.invoice_number}</p><p className="text-sm text-slate-400">{new Date(inv.issue_date).toLocaleDateString()}</p></div><div className="text-right"><p className="font-mono text-cyan-100">${inv.amount_due}</p><p className="text-sm capitalize text-slate-400">{inv.status}</p></div></div>):<p className="text-slate-400">No invoices yet.</p>}</div></section></div>);
+};
+
+export default Billing;

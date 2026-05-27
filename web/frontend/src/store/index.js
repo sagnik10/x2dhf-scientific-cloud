@@ -1,0 +1,1 @@
+import {configureStore} from '@reduxjs/toolkit';import authReducer from './authSlice';import computationReducer from './computationSlice';import resultReducer from './resultSlice';const store=configureStore({reducer:{auth:authReducer,computation:computationReducer,result:resultReducer}});export default store;

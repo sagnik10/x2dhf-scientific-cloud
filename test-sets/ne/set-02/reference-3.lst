@@ -1,0 +1,48 @@
+///////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////  FINITE DIFFERENCE 2D HARTREE-FOCK  ////////////////////////////// 
+////////////////////////////             version 3.0             ////////////////////////////// 
+///////////////////////////////////////////////////////////////////////////////////////////////
+ ... start of input data ...
+  title Ne                                                                        
+  method hf                                                                       
+  nuclei  10.0  0.0  2.0                                                          
+  config  0                                                                       
+  1 pi                                                                            
+  2 sigma                                                                         
+  1 sigma   end                                                                   
+  grid 210 65.0                                                                   
+  orbpot old                                                                      
+  lcao                                                                            
+  1.0   2 1   6.0     0.0   1 0 9.0                                               
+  1.0   2 1   8.0     0.0   1 0 9.0                                               
+  1.0   2 0   9.0     0.0   1 0 9.0                                               
+  1.0   1 0  10.0     0.0   1 0 9.0                                               
+  scf 4500 10 10 12 3                                                             
+  conv 200                                                                        
+  mcsor-o                                                                         
+  mcsor-c                                                                         
+
+  Error: label "mcsor-c " is not supported. 
+
+  Try one of the following:
+        break     config    conv      debug     dft     
+        fefield   fermi     fix       fixorb    mmoments
+        initial   inout     interp    lcao      lagra   
+        mcsor     method    multipol  nuclei    omega   
+        orbpot    order     potgsz    potgszg   potharm3
+        potkh     print     prtevery  scf       scfexch 
+        sor       stop      title     xalpha    potharm2
+        pothooke  potsap    lxcpolar  detnan    fixnan  
+        mcsor-ce  mcsor-o   sor4orb   sor4pot   out4pair
+        slowexch  chktoten  coulexch  fastscf   ldasap  
+
+        omegaopt  tail      kinpot    lxcpolar  densthld
+        potcoul2  potcoul3  lm        lm0       lm1     
+        lm2       altsweep  omegaz    intracul  extracul
+        fixpot    gauss     grid      homo      plot    
+
+
+command-line:  /home/jkob/github/x2dhf/bin/xhf input-3 tmp current-hf
+      system:  Linux neptun 6.2.15-100.fc36.x86_64 x86_64 x86_64 GNU/Linux
+         CPU:  Intell Core Processor (Haswell, IBRS) / CPU(s)=20 / OMP_THREAD_LIMIT=20
+////////////////////////////////////////////////////////////////////////////////////////////////

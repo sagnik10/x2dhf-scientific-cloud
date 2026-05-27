@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "checkJs": false
+  },
+  "include": [
+    "web/frontend/src"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/build",
+    "web/backend/.venv",
+    "web/backend/staticfiles",
+    "web/backend/job_workdir"
+  ]
+}

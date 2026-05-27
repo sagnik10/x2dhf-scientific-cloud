@@ -1,0 +1,102 @@
+version:'3.9'
+services:
+  postgres:
+    image:postgres:15-alpine
+    environment:
+      POSTGRES_DB:x2dhf
+      POSTGRES_USER:postgres
+      POSTGRES_PASSWORD:postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:["CMD-SHELL","pg_isready -U postgres"]
+      interval:10s
+      timeout:5s
+      retries:5
+  redis:
+    image:redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test:["CMD","redis-cli","ping"]
+      interval:10s
+      timeout:5s
+      retries:5
+  backend:
+    build:
+      context:./backend
+      dockerfile:Dockerfile.backend
+    environment:
+      DEBUG:${DEBUG:-False}
+      DJANGO_SECRET_KEY:${DJANGO_SECRET_KEY:-dev-secret-key}
+      DB_NAME:x2dhf
+      DB_USER:postgres
+      DB_PASSWORD:postgres123
+      DB_HOST:postgres
+      DB_PORT:5432
+      REDIS_URL:redis://redis:6379/0
+      CORS_ORIGINS:http://localhost:3000,http://localhost:8000
+      X2DHF_PATH:/usr/local/bin/x2dhf
+      X2DHF_DFT_PATH:/usr/local/bin/x2dhf_dft
+      QE_PATH:/usr/local/bin/pw.x
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition:service_healthy
+      redis:
+        condition:service_healthy
+    command:gunicorn x2dhf_project.wsgi:application --bind 0.0.0.0:8000 --workers 4
+  frontend:
+    build:
+      context:./frontend
+      dockerfile:Dockerfile
+    environment:
+      REACT_APP_API_URL:http://localhost:8000/api
+      REACT_APP_WSS_URL:ws://localhost:8000/ws
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+    command:npm start
+  celery:
+    build:
+      context:./backend
+      dockerfile:Dockerfile.backend
+    environment:
+      DEBUG:${DEBUG:-False}
+      DJANGO_SECRET_KEY:${DJANGO_SECRET_KEY:-dev-secret-key}
+      DB_NAME:x2dhf
+      DB_USER:postgres
+      DB_PASSWORD:postgres123
+      DB_HOST:postgres
+      DB_PORT:5432
+      REDIS_URL:redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+      - redis
+    command:celery -A x2dhf_project worker -l info
+  nginx:
+    image:nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test:["CMD","wget","--quiet","--tries=1","--spider","http://localhost/health/"]
+      interval:10s
+      timeout:5s
+      retries:5
+volumes:
+  postgres_data:

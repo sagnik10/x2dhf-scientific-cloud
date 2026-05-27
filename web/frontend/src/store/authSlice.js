@@ -1,0 +1,13 @@
+import {createSlice,createAsyncThunk} from '@reduxjs/toolkit';
+import {authAPI} from '../api/client';
+
+export const loginUser=createAsyncThunk('auth/login',async({email,password},thunkAPI)=>{try{const response=await authAPI.login(email,password);localStorage.setItem('token',response.data.access);const user=await authAPI.me();return {...response.data,user:user.data};}catch(error){return thunkAPI.rejectWithValue(error.response?.data||'Login failed');}});
+export const fetchCurrentUser=createAsyncThunk('auth/me',async(_,thunkAPI)=>{try{const response=await authAPI.me();return response.data;}catch(error){localStorage.removeItem('token');return thunkAPI.rejectWithValue(error.response?.data||'Session expired');}});
+export const registerUser=createAsyncThunk('auth/register',async({username,email,password},thunkAPI)=>{try{const response=await authAPI.register(username,email,password);return response.data;}catch(error){return thunkAPI.rejectWithValue(error.response?.data||'Registration failed');}});
+export const logoutUser=createAsyncThunk('auth/logout',async()=>{localStorage.removeItem('token');return null;});
+
+const initialState={token:localStorage.getItem('token')||null,user:null,isAuthenticated:!!localStorage.getItem('token'),loading:false,hydrating:!!localStorage.getItem('token'),error:null};
+const authSlice=createSlice({name:'auth',initialState,reducers:{restoreAuth:(state,action)=>{state.token=action.payload;state.isAuthenticated=true;state.hydrating=true;}},extraReducers:builder=>{builder.addCase(loginUser.pending,state=>{state.loading=true;state.error=null;}).addCase(loginUser.fulfilled,(state,action)=>{state.loading=false;state.hydrating=false;state.token=action.payload.access;state.user=action.payload.user;state.isAuthenticated=true;}).addCase(loginUser.rejected,(state,action)=>{state.loading=false;state.hydrating=false;state.error=action.payload;state.isAuthenticated=false;state.user=null;}).addCase(fetchCurrentUser.pending,state=>{state.hydrating=true;}).addCase(fetchCurrentUser.fulfilled,(state,action)=>{state.hydrating=false;state.user=action.payload;state.isAuthenticated=true;}).addCase(fetchCurrentUser.rejected,(state,action)=>{state.hydrating=false;state.token=null;state.user=null;state.error=action.payload;state.isAuthenticated=false;}).addCase(registerUser.pending,state=>{state.loading=true;state.error=null;}).addCase(registerUser.fulfilled,state=>{state.loading=false;state.error=null;}).addCase(registerUser.rejected,(state,action)=>{state.loading=false;state.error=action.payload;}).addCase(logoutUser.fulfilled,state=>{state.token=null;state.isAuthenticated=false;state.user=null;state.hydrating=false;});}});
+
+export const {restoreAuth}=authSlice.actions;
+export default authSlice.reducer;

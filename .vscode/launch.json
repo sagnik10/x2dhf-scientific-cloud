@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Django: X2DHF SaaS",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}\\manage.py",
+      "args": [
+        "runserver",
+        "127.0.0.1:8000"
+      ],
+      "django": true,
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}\\web\\backend;${workspaceFolder}\\web\\backend\\x2dhf_project",
+        "X2DHF_DIRECTORY": "${workspaceFolder}",
+        "X2DHF_BINARY_PATH": "${workspaceFolder}\\bin\\xhf"
+      }
+    }
+  ]
+}

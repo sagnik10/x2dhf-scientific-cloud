@@ -1,0 +1,28 @@
+import React from 'react';
+import {Outlet,NavLink,useNavigate}from'react-router-dom';
+import {useDispatch,useSelector}from'react-redux';
+import {logoutUser}from'../store/authSlice';
+import logo from'../assets/x2dhf-logo.png';
+
+const baseLinks=[['/dashboard','Dashboard','01'],['/computations','Computations','02'],['/results','Results','03'],['/learn','Physics','04'],['/settings','Settings','05']];
+const adminLink=['/admin-dashboard','Admin','06'];
+const navClass=({isActive})=>`group flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition lg:gap-3 lg:px-4 lg:py-3 ${isActive?'border border-white/20 bg-white/10 text-white shadow-lg shadow-slate-950/30':'text-slate-300 hover:bg-white/5 hover:text-white'}`;
+
+const Layout=()=>{
+ const dispatch=useDispatch();
+ const navigate=useNavigate();
+ const {user}=useSelector(state=>state.auth);
+ const isAdmin=!!(user?.is_staff||user?.is_superuser);
+ const links=isAdmin?[...baseLinks,adminLink]:baseLinks;
+ const handleLogout=()=>{dispatch(logoutUser());navigate('/login',{replace:true});};
+ return <div className="min-h-screen bg-slate-950 text-slate-100 lg:flex">
+  <aside className="sidebar-shell flex border-b border-white/10 bg-slate-950/95 shadow-2xl shadow-slate-950/50 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:flex-col lg:border-b-0 lg:border-r">
+   <div className="flex min-w-0 items-center gap-3 p-4 lg:block lg:p-6"><NavLink to="/dashboard" className="flex items-center gap-3"><img src={logo} alt="X2DHF" className="h-11 w-11 rounded-lg border border-white/15 shadow-lg lg:h-12 lg:w-12"/><div><h1 className="text-xl font-black tracking-wide text-white lg:text-2xl">X2DHF</h1><p className="hidden text-xs text-slate-400 sm:block">Python HF and DFT SaaS</p></div></NavLink><div className="ml-auto hidden rounded-lg border border-green-400/20 bg-green-500/10 px-3 py-2 text-xs text-green-100 lg:ml-0 lg:mt-5 lg:block lg:px-4 lg:py-3"><div className="font-mono uppercase tracking-[.24em] text-green-300/80">Runtime</div><div className="mt-1 font-semibold">Python kernel online</div></div></div>
+   <nav className="flex flex-1 gap-2 overflow-x-auto px-3 pb-3 lg:block lg:space-y-2 lg:overflow-y-auto lg:overflow-x-hidden lg:px-4 lg:pb-4">{links.map(([to,label,index])=><NavLink key={to} to={to} className={navClass}><span className="font-mono text-xs text-blue-200">{index}</span><span>{label}</span><span className="ml-auto hidden h-1.5 w-1.5 rounded-full bg-white/0 transition group-hover:bg-white lg:block"/></NavLink>)}<button onClick={handleLogout} className="shrink-0 rounded-lg px-3 py-2 text-left text-sm text-slate-300 transition hover:bg-red-500/10 hover:text-red-100 lg:mt-6 lg:w-full lg:px-4 lg:py-3">Logout</button></nav>
+   <footer className="hidden border-t border-white/10 p-4 lg:block"><div className="rounded-lg border border-white/10 bg-slate-900/70 p-4 shadow-xl"><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-green-400"/><span className="text-xs font-semibold uppercase tracking-[.22em] text-green-200">Operational</span></div><div className="mt-3 text-sm font-bold text-white">X2DHF SaaS</div><div className="mt-1 text-xs leading-5 text-slate-400">Free scientific workspace for stored inputs, SCF runs, results, analytics, and account controls.</div><div className="mt-4 grid grid-cols-2 gap-2 text-xs"><NavLink to="/learn" className="rounded border border-slate-700 px-2 py-1 text-slate-300 hover:border-white/40 hover:text-white">Physics</NavLink><NavLink to="/results" className="rounded border border-slate-700 px-2 py-1 text-slate-300 hover:border-white/40 hover:text-white">Results</NavLink><NavLink to="/computations" className="rounded border border-slate-700 px-2 py-1 text-slate-300 hover:border-white/40 hover:text-white">Run</NavLink>{isAdmin?<NavLink to="/admin-dashboard" className="rounded border border-slate-700 px-2 py-1 text-slate-300 hover:border-white/40 hover:text-white">Admin</NavLink>:<NavLink to="/settings" className="rounded border border-slate-700 px-2 py-1 text-slate-300 hover:border-white/40 hover:text-white">Account</NavLink>}</div></div></footer>
+  </aside>
+  <main className="relative flex-1 overflow-x-hidden bg-[radial-gradient(circle_at_top_right,rgba(30,64,175,.14),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(34,197,94,.10),transparent_30%),linear-gradient(135deg,rgba(15,23,42,.96),rgba(2,6,23,.94))]"><div className="pointer-events-none absolute inset-0 circuit-grid opacity-20"/><div className="relative min-h-screen p-4 sm:p-6 lg:p-8"><Outlet/></div><footer className="relative border-t border-white/10 bg-slate-950/95 px-4 py-6 text-xs text-slate-400 sm:px-6 lg:px-8"><div className="mx-auto grid max-w-7xl gap-4 md:grid-cols-[1fr_auto] md:items-center"><div><div className="font-semibold text-white">X2DHF Scientific Cloud Workspace</div><div className="mt-1 max-w-2xl leading-5">Python runtime for guided HF/DFT workflows. Outputs, inputs, audit events, and scientific results are stored per user.</div></div><div className="flex flex-wrap gap-2"><NavLink to="/learn" className="rounded border border-slate-700 px-3 py-1.5 hover:border-white/40 hover:text-white">Docs</NavLink><NavLink to="/settings" className="rounded border border-slate-700 px-3 py-1.5 hover:border-white/40 hover:text-white">Account</NavLink>{isAdmin&&<NavLink to="/admin-dashboard" className="rounded border border-slate-700 px-3 py-1.5 hover:border-white/40 hover:text-white">Admin</NavLink>}<span className="rounded border border-slate-800 px-3 py-1.5 text-slate-500">2026</span></div></div></footer></main>
+ </div>;
+};
+
+export default Layout;

@@ -1,0 +1,25 @@
+{
+  "venvPath": "web/backend",
+  "venv": ".venv",
+  "include": [
+    "web/backend"
+  ],
+  "exclude": [
+    "**/.venv",
+    "**/node_modules",
+    "**/build",
+    "**/staticfiles",
+    "**/job_workdir",
+    "../x2dhf-saas",
+    "C:/Users/Administrator/Downloads/x2dhf-saas",
+    "web/frontend/node_modules",
+    "web/frontend/build",
+    "web/backend/staticfiles",
+    "web/backend/job_workdir",
+    "**/__pycache__"
+  ],
+  "extraPaths": [
+    "web/backend/x2dhf_project",
+    "web/backend"
+  ]
+}

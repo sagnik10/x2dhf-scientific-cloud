@@ -1,0 +1,18 @@
+import axios from 'axios';
+
+const API_URL=process.env.REACT_APP_API_URL||'/api';
+const getToken=()=>localStorage.getItem('token');
+const client=axios.create({baseURL:API_URL,headers:{'Content-Type':'application/json'}});
+
+client.interceptors.request.use(config=>{const token=getToken();if(token)config.headers.Authorization=`Bearer ${token}`;return config;},error=>Promise.reject(error));
+client.interceptors.response.use(response=>response,error=>{if(error.response?.status===401){localStorage.removeItem('token');window.location.replace('/login');}return Promise.reject(error);});
+
+export const authAPI={login:(email,password)=>client.post('/auth/jwt/create/',{email,password}),register:(username,email,password)=>client.post('/auth/users/',{username,email,password}),forgotPassword:email=>client.post('/core/public-auth/forgot_password/',{email}),refresh:refresh=>client.post('/auth/jwt/refresh/',{refresh}),verify:()=>client.get('/auth/users/me/'),me:()=>client.get('/users/users/me/')};
+export const userAPI={getProfile:()=>client.get('/users/users/me/'),updateProfile:data=>client.patch('/users/users/me/',data),generateApiKey:()=>client.post('/users/users/generate_api_key/'),getUsage:()=>client.get('/users/users/usage/')};
+export const computationAPI={getSystems:params=>client.get('/computations/systems/',{params}),createSystem:data=>client.post('/computations/systems/',data),getSystem:id=>client.get(`/computations/systems/${id}/`),updateSystem:(id,data)=>client.patch(`/computations/systems/${id}/`,data),deleteSystem:id=>client.delete(`/computations/systems/${id}/`),getComputations:params=>client.get('/computations/jobs/',{params}),createComputation:data=>client.post('/computations/jobs/',data),getComputation:id=>client.get(`/computations/jobs/${id}/`),cancelComputation:id=>client.post(`/computations/jobs/${id}/cancel/`),retryComputation:id=>client.post(`/computations/jobs/${id}/retry/`),getRuntimeOutput:id=>client.get(`/computations/jobs/${id}/runtime_output/`),getStatistics:()=>client.get('/computations/jobs/statistics/'),getScience:()=>client.get('/computations/jobs/science/'),getNativeStatus:()=>client.get('/computations/jobs/native_status/'),getNativeBuild:()=>client.get('/computations/jobs/native_build/'),startNativeBuild:mode=>client.post('/computations/jobs/native_build/',{mode}),parseInput:input=>client.post('/computations/jobs/parse_input/',{input})};
+export const resultAPI={getResults:params=>client.get('/results/results/',{params}),getResult:id=>client.get(`/results/results/${id}/`),downloadRaw:id=>client.get(`/results/results/${id}/download_raw/`,{responseType:'blob'}),exportResult:(id,format)=>client.post(`/results/results/${id}/export/`,{format})};
+export const billingAPI={getInvoices:()=>client.get('/billing/invoices/'),getInvoice:id=>client.get(`/billing/invoices/${id}/`),payInvoice:(id,token)=>client.post(`/billing/invoices/${id}/pay/`,{stripe_token:token}),getPayments:()=>client.get('/billing/payments/'),getUsage:()=>client.get('/billing/usage/current/'),getPricingPlans:()=>client.get('/billing/pricing/'),upgradeSubscription:plan=>client.post('/users/subscriptions/upgrade/',{plan})};
+export const analyticsAPI={getUser:()=>client.get('/core/analytics/user/'),getAdmin:()=>client.get('/core/analytics/admin/')};
+export const adminContentAPI={getTheoryPosts:()=>client.get('/core/theory-posts/'),createTheoryPost:data=>client.post('/core/theory-posts/',data),updateTheoryPost:(id,data)=>client.patch(`/core/theory-posts/${id}/`,data),getControlPresets:()=>client.get('/core/control-presets/'),createControlPreset:data=>client.post('/core/control-presets/',data),updateControlPreset:(id,data)=>client.patch(`/core/control-presets/${id}/`,data)};
+
+export default client;

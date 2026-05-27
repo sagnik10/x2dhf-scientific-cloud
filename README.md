@@ -107,14 +107,26 @@ After dependencies are installed and the virtual environment exists:
 .\web\backend\.venv\Scripts\Activate.ps1; python manage.py migrate; python manage.py runserver
 ```
 
-## Default Admin Login
+## Admin Login
 
-```text
-Email: admin@x2dhf.local
-Password: Admin@12345
+No public default admin username or password is shipped.
+
+Create a staff/superuser account from the server:
+
+```powershell
+python manage.py createsuperuser
 ```
 
-Use `/admin-login` for the admin dashboard.
+Use `/admin-login` after creating the admin account.
+
+For local-only development, automatic dev-admin creation is opt-in and requires all values below:
+
+```powershell
+$env:X2DHF_CREATE_DEV_ADMIN="1"
+$env:X2DHF_ADMIN_EMAIL="your-admin@example.com"
+$env:X2DHF_ADMIN_PASSWORD="change-this-password"
+python manage.py runserver
+```
 
 ## Normal User Flow
 
@@ -180,6 +192,9 @@ DB_ENGINE=sqlite
 AUTO_START_COMPUTATIONS=True
 PYTHON_SCIENCE_RUNTIME=True
 USE_NATIVE_X2DHF=False
+X2DHF_CREATE_DEV_ADMIN=False
+X2DHF_ADMIN_EMAIL=
+X2DHF_ADMIN_PASSWORD=
 ```
 
 ## Production Notes

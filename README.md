@@ -1,6 +1,56 @@
 # X2DHF Scientific Cloud
 
-Python-first Django and React SaaS workspace for X2DHF-style Hartree-Fock and DFT computations, guided input cards, saved runtime output, user dashboards, admin analytics, theory publishing, and runtime control presets.
+A modern **Python-first Django + React scientific cloud platform** for **X2DHF-style Hartree-Fock (HF) and Density Functional Theory (DFT) computations**, featuring guided scientific input generation, runtime execution, stored computation history, analytics dashboards, theory publishing, and configurable runtime workflows.
+
+---
+
+## 🎥 Prototype Demonstration
+
+**Demo Video:**  
+https://drive.google.com/file/d/1MWJwffOT-YflU_OGyWNLSmeCculdvHZf/view?usp=sharing
+
+This prototype demonstrates the X2DHF Scientific Cloud interface, scientific workflow, runtime execution, computation management, dashboards, and guided HF/DFT computation environment.
+
+---
+
+## Features
+
+- **Django 4 backend** with JWT authentication.
+- **React frontend** integrated into Django.
+- **Python-first scientific runtime** for:
+  - Hartree-Fock (HF)
+  - Density Functional Theory (DFT)
+  - HFS
+  - OED
+  - TED
+  - SCMC
+  - Quantum Espresso-style scientific workflows
+- **X2DHF-style guided input builder**:
+  - Atoms and molecules
+  - Grid cards
+  - SCF control parameters
+  - Orbital potentials
+  - Advanced runtime cards
+  - Scientific explanations
+- **Scientific runtime output system** with:
+  - Stored execution logs
+  - Parsed scientific results
+  - Computation history
+- **User analytics dashboard**:
+  - Computation history
+  - Charts
+  - Recent scientific activity
+- **Administrative dashboard**:
+  - Platform analytics
+  - SEO management
+  - Theory publishing
+  - Runtime presets
+- **SQLite support by default**
+- **Preserved original X2DHF scientific source materials** for comparison and reference.
+
+---
+
+## Repository Name
 
 Recommended repository name:
 
@@ -8,19 +58,9 @@ Recommended repository name:
 x2dhf-scientific-cloud
 ```
 
-## Features
+---
 
-- Django 4 backend with JWT authentication.
-- React frontend served by Django in `runserver` mode.
-- Python quantum runtime for HF, DFT, HFS, OED, TED, SCMC, and Quantum Espresso-style workflows.
-- X2DHF-style input builder with atoms, molecules, grid cards, SCF controls, orbital potentials, advanced cards, and explanations.
-- Runtime output panel with stored logs and parsed scientific results.
-- User dashboard with analytics, history, charts, and recent actions.
-- Staff-only admin dashboard with platform analytics, SEO tools, theory post publishing, and runtime control presets.
-- Local SQLite database by default.
-- Optional original X2DHF Fortran/C reference files remain in the repository for comparison and source material.
-
-## Project Layout
+## Project Structure
 
 ```text
 .
@@ -42,37 +82,56 @@ x2dhf-scientific-cloud
 └── lda_orbitals
 ```
 
+---
+
 ## Requirements
 
-- Windows 10/11 or Linux
-- Python 3.10+
-- Node.js 18+
-- PowerShell on Windows
+### Supported Platforms
 
-The web application runs through Django. The default runtime is Python-based, so no manual Fortran, C, CMake, WSL, Libxc, or Quantum Espresso installation is required for normal website use.
+- Windows 10/11
+- Linux
 
-## Fresh Installation
+### Software Requirements
 
-From the repository root:
+- Python **3.10+**
+- Node.js **18+**
+- PowerShell (Windows)
+
+The web application runs through **Django**, while the default scientific runtime is **Python-based**, meaning no manual installation of:
+
+- Fortran
+- C/C++
+- CMake
+- WSL
+- Libxc
+- Quantum Espresso
+
+is required for standard web-based usage.
+
+---
+
+## Installation
+
+From repository root:
 
 ```powershell
 cd C:\Users\Administrator\Downloads\x2dhf-main-website\x2dhf-main
 ```
 
-Create and activate the backend virtual environment:
+### Create Backend Virtual Environment
 
 ```powershell
 python -m venv web\backend\.venv
 .\web\backend\.venv\Scripts\Activate.ps1
 ```
 
-Install backend dependencies:
+### Install Backend Dependencies
 
 ```powershell
 pip install -r web\backend\requirements.txt
 ```
 
-Install frontend dependencies:
+### Install Frontend Dependencies
 
 ```powershell
 cd web\frontend
@@ -81,13 +140,13 @@ npm run build
 cd ..\..
 ```
 
-Prepare the database:
+### Prepare Database
 
 ```powershell
 python manage.py migrate
 ```
 
-Run the full software:
+### Run the Platform
 
 ```powershell
 python manage.py runserver
@@ -99,27 +158,35 @@ Open:
 http://127.0.0.1:8000/
 ```
 
-## One Command After Setup
+---
 
-After dependencies are installed and the virtual environment exists:
+## One-Command Startup
+
+After initial dependency installation:
 
 ```powershell
 .\web\backend\.venv\Scripts\Activate.ps1; python manage.py migrate; python manage.py runserver
 ```
 
-## Admin Login
+---
 
-No public default admin username or password is shipped.
+## Authentication & Admin
 
-Create a staff/superuser account from the server:
+No public admin credentials are distributed.
+
+Create an administrator account:
 
 ```powershell
 python manage.py createsuperuser
 ```
 
-Use `/admin-login` after creating the admin account.
+Login using:
 
-For local-only development, automatic dev-admin creation is opt-in and requires all values below:
+```text
+/admin-login
+```
+
+### Optional Local Development Admin
 
 ```powershell
 $env:X2DHF_CREATE_DEV_ADMIN="1"
@@ -128,40 +195,54 @@ $env:X2DHF_ADMIN_PASSWORD="change-this-password"
 python manage.py runserver
 ```
 
-## Normal User Flow
+---
 
-1. Register a user account.
-2. Login.
-3. Open `Computations`.
-4. Choose atoms, molecule mode, theory, functional, grid, orbital potential, SCF limits, and advanced cards.
-5. Run computation.
-6. Watch runtime output.
-7. Review saved results and dashboard analytics.
+## Scientific Workflow
 
-## Admin Flow
+### User Workflow
 
-1. Login through `/admin-login`.
-2. Open Admin.
-3. Review platform analytics and theory usage.
-4. Manage SEO metadata.
-5. Publish theory posts.
-6. Create runtime control presets for guided scientific workflows.
+1. Register an account
+2. Login
+3. Open **Computations**
+4. Select:
+   - Atoms
+   - Molecule mode
+   - Theory
+   - Functional
+   - Grid
+   - Orbital potentials
+   - SCF controls
+   - Advanced scientific cards
+5. Run computation
+6. Observe runtime output
+7. Review stored results and analytics
+
+### Administrative Workflow
+
+1. Login through `/admin-login`
+2. Access Admin Dashboard
+3. Review platform analytics
+4. Manage SEO metadata
+5. Publish scientific theory posts
+6. Create runtime presets
+
+---
 
 ## Useful Commands
 
-Backend check:
+### Django Health Check
 
 ```powershell
 .\web\backend\.venv\Scripts\python.exe manage.py check
 ```
 
-Run tests:
+### Run Tests
 
 ```powershell
 .\web\backend\.venv\Scripts\python.exe -m pytest
 ```
 
-Rebuild frontend:
+### Rebuild Frontend
 
 ```powershell
 cd web\frontend
@@ -169,21 +250,23 @@ npm run build
 cd ..\..
 ```
 
-Apply migrations:
+### Apply Database Migrations
 
 ```powershell
 .\web\backend\.venv\Scripts\python.exe manage.py migrate
 ```
 
+---
+
 ## Configuration
 
-Backend environment values can be placed in:
+Environment values can be placed inside:
 
 ```text
 web/backend/.env
 ```
 
-Common values:
+Example configuration:
 
 ```env
 DEBUG=True
@@ -197,25 +280,50 @@ X2DHF_ADMIN_EMAIL=
 X2DHF_ADMIN_PASSWORD=
 ```
 
-## Production Notes
+---
 
-Before production deployment:
+## Production Deployment
 
-- Set `DEBUG=False`.
-- Replace `SECRET_KEY`.
-- Use PostgreSQL instead of SQLite.
-- Configure `ALLOWED_HOSTS`.
-- Configure static file serving.
-- Run `npm run build`.
-- Run `python manage.py collectstatic`.
-- Use a real process manager such as Gunicorn/Uvicorn plus Nginx on Linux.
-- Replace local admin credentials.
+Before deployment:
+
+- Set `DEBUG=False`
+- Replace `SECRET_KEY`
+- Configure `ALLOWED_HOSTS`
+- Move to PostgreSQL
+- Configure static file serving
+- Build frontend:
+
+```powershell
+npm run build
+```
+
+Collect static files:
+
+```powershell
+python manage.py collectstatic
+```
+
+Recommended deployment stack:
+
+- **Gunicorn/Uvicorn**
+- **Nginx**
+- **Linux server environment**
+
+---
 
 ## Scientific Scope
 
-The original X2DHF folders, samples, orbitals, and documentation remain in this checkout. The SaaS runtime is Python-first and designed to preserve X2DHF-style input/output structure, guided HF/DFT workflows, and stored computation history inside a web application.
+The repository preserves original **X2DHF scientific source materials**, orbital files, samples, and documentation.
 
-For strict validation against the original Fortran/C implementation, compare against the reference files in:
+The SaaS runtime is **Python-first** while preserving:
+
+- X2DHF-style scientific input
+- HF/DFT workflow methodology
+- Scientific runtime outputs
+- Computation history
+- Guided quantum chemistry workflows
+
+For validation against the original implementation, compare results using:
 
 ```text
 src/
@@ -226,6 +334,13 @@ hf_orbitals/
 lda_orbitals/
 ```
 
+---
+
 ## License
 
-See `LICENSE` and `COPYING`.
+See:
+
+```text
+LICENSE
+COPYING
+```

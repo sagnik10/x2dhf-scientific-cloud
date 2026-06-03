@@ -3,9 +3,9 @@ import {useDispatch,useSelector} from 'react-redux';
 import {useNavigate,Link} from 'react-router-dom';
 import {loginUser} from '../store/authSlice';
 import QuantumBackdrop from '../components/QuantumBackdrop';
-import logo from '../assets/x2dhf-logo.png';
 
 const validEmail=value=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const logo='/favicon.png';
 
 const Login=({mode='user'})=>{
  const [email,setEmail]=useState('');

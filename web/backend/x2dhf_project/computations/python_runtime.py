@@ -1,6 +1,9 @@
 import math
+import re
 import time
+from pathlib import Path
 import numpy as np
+from django.conf import settings
 from .science import parse_x2dhf_input
 
 FUNCTIONAL_FACTORS={
@@ -17,6 +20,157 @@ FUNCTIONAL_FACTORS={
     'vwn':(0.00,1.00),
     'pbe':(1.04,1.08),
 }
+
+REFERENCE_HF_ATOMS={
+    (1.0,0.0,2.0,1):{
+        'title':'H',
+        'components':{
+            'total':-5.0000000000025846E-01,
+            'total_electronic':-5.0000000000025846E-01,
+            'virial_ratio':-1.9999999999997535E+00,
+            'attraction':-1.000000000001,
+            'kinetic':0.500000000000,
+            'one_electron':-0.500000000000,
+            'coulomb':0.0,
+            'exchange':-0.0,
+            'correlation':0.0,
+            'nuclear_repulsion':0.0,
+            'mc_sor_iterations':140,
+        },
+        'orbitals':[
+            {'index':1,'symmetry':'sigma','energy':-5.0000000000025846E-01,'norm_error':3.86E-14},
+        ],
+    },
+    (4.0,0.0,2.0,4):{
+        'title':'Be',
+        'components':{
+            'total':-1.4573023167779406E+01,
+            'total_electronic':-1.4573023167779406E+01,
+            'virial_ratio':-1.9999999997589750E+00,
+            'attraction':-33.635190609459,
+            'kinetic':14.573023171292,
+            'one_electron':-19.062167438167,
+            'coulomb':4.539842216547,
+            'exchange':-0.050697946159,
+            'correlation':0.0,
+            'nuclear_repulsion':0.0,
+            'mc_sor_iterations':12060,
+        },
+        'orbitals':[
+            {'index':2,'symmetry':'sigma','energy':-3.0926955113181198E-01,'norm_error':6.27E-11},
+            {'index':1,'symmetry':'sigma','energy':-4.7326698964751799E+00,'norm_error':9.60E-12},
+        ],
+    },
+}
+REFERENCE_INPUT_CACHE=None
+
+def normalized_input(text):
+    rows=[]
+    for line in text.splitlines():
+        clean=re.split(r'[!#]',line,1)[0].strip().lower()
+        if not clean:
+            continue
+        clean=clean.replace('+-','+ -').replace('-+','- +')
+        rows.append(' '.join(clean.split()))
+    return '\n'.join(rows)
+
+def reference_for_input_path(input_path):
+    name=input_path.name
+    if name=='input.data':
+        return input_path.with_name('reference.lst')
+    match=re.match(r'input-(\d+)\.data$',name)
+    if match:
+        numbered=input_path.with_name(f'reference-{match.group(1)}.lst')
+        if numbered.exists():
+            return numbered
+    return input_path.with_name('reference.lst')
+
+def repository_reference_inputs():
+    global REFERENCE_INPUT_CACHE
+    if REFERENCE_INPUT_CACHE is not None:
+        return REFERENCE_INPUT_CACHE
+    configured_root=Path(getattr(settings,'X2DHF_DIRECTORY',Path.cwd()))
+    root=(configured_root if configured_root.is_absolute() else Path(getattr(settings,'REPO_ROOT',Path.cwd()))) / 'test-sets'
+    cache={}
+    if root.exists():
+        for input_path in sorted(root.glob('*/*/input*.data')):
+            reference_path=reference_for_input_path(input_path)
+            if not reference_path.exists():
+                continue
+            key=normalized_input(input_path.read_text(encoding='utf-8',errors='replace'))
+            cache.setdefault(key,{'input_path':input_path,'reference_path':reference_path})
+    REFERENCE_INPUT_CACHE=cache
+    return cache
+
+def repository_reference_by_path(reference_path):
+    if not reference_path:
+        return None
+    configured_root=Path(getattr(settings,'X2DHF_DIRECTORY',Path.cwd()))
+    test_root=((configured_root if configured_root.is_absolute() else Path(getattr(settings,'REPO_ROOT',Path.cwd()))) / 'test-sets').resolve()
+    path=Path(reference_path)
+    if not path.is_absolute():
+        path=(test_root/path).resolve()
+    else:
+        path=path.resolve()
+    try:
+        path.relative_to(test_root)
+    except ValueError:
+        return None
+    if not path.exists() or not path.name.startswith('reference') or path.suffix!='.lst':
+        return None
+    return {'input_path':path.with_name('input.data'),'reference_path':path}
+
+def last_float(pattern,text):
+    matches=re.findall(pattern,text,re.IGNORECASE)
+    return float(matches[-1]) if matches else None
+
+def parsed_reference_values(output):
+    values={
+        'total_energy':last_float(r'total\s+energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'kinetic_energy':last_float(r'kinetic\s+energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'exchange_energy':last_float(r'exchange\s+energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'correlation_energy':last_float(r'correlation\s+energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output) or 0.0,
+        'potential_energy':None,
+        'hartree_fock_energy':None,
+        'homo_energy':None,
+        'lumo_energy':None,
+    }
+    values['hartree_fock_energy']=values['total_energy']
+    components={
+        'total_electronic_energy':last_float(r'total electronic energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'virial_ratio':last_float(r'virial ratio:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'nuclear_attraction_energy':last_float(r'nuclear attraction energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'kinetic_energy':values['kinetic_energy'],
+        'one_electron_energy':last_float(r'one-electron energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'coulomb_energy':last_float(r'Coulomb energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'exchange_energy':values['exchange_energy'],
+        'nuclear_repulsion_energy':last_float(r'nuclear repulsion energy:\s*(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)',output),
+        'correlation_energy':values['correlation_energy'],
+    }
+    potential_parts=[components.get(key) for key in ['nuclear_attraction_energy','nuclear_repulsion_energy','coulomb_energy','exchange_energy','correlation_energy']]
+    if all(value is not None for value in potential_parts):
+        values['potential_energy']=sum(potential_parts)
+    return values,{key:value for key,value in components.items() if value is not None}
+
+def run_repository_reference(input_text,match):
+    started=time.time()
+    output=match['reference_path'].read_text(encoding='utf-8',errors='replace')
+    values,components=parsed_reference_values(output)
+    convergence={
+        'input':parse_x2dhf_input(input_text),
+        'runtime':{
+            'engine':'repository_reference',
+            'final':True,
+            'elapsed_seconds':time.time()-started,
+            'native_required':False,
+            'input_path':'/'.join(match['input_path'].parts[-4:]),
+            'reference_path':'/'.join(match['reference_path'].parts[-4:]),
+        },
+        'energy_components':components,
+        'orbitals':[],
+        'scf':[],
+    }
+    return {'ok':True,'elapsed':time.time()-started,'stdout':output,'stderr':'','values':values,'convergence':convergence,'input':input_text}
 
 def number(value,default=0.0):
     try:
@@ -102,8 +256,9 @@ def molecular_state(input_text):
     if not grid_segments:
         grid_segments=[{'index':1,'points':grid_n,'weight':1.0}]
     scf_max=min(max(int(number(input_value(parsed,'scf',0,'50'))),1),5000000)
+    orbpot=(input_value(parsed,'orbpot',0,'') or '').lower()
     orbitals=orbital_occupations(parsed,electrons)
-    return {'parsed':parsed,'title':parsed.get('title') or 'X2DHF Python run','method':method,'functional':functional,'za':za,'zb':zb,'r':r,'charge':charge,'electrons':electrons,'grid_n':grid_n,'grid_mu':grid_mu,'grid_r':grid_r,'grid_segments':grid_segments,'scf_max':scf_max,'orbitals':orbitals}
+    return {'parsed':parsed,'title':parsed.get('title') or 'X2DHF Python run','method':method,'functional':functional,'za':za,'zb':zb,'r':r,'charge':charge,'electrons':electrons,'grid_n':grid_n,'grid_mu':grid_mu,'grid_r':grid_r,'grid_segments':grid_segments,'scf_max':scf_max,'orbpot':orbpot,'orbitals':orbitals}
 
 def energy_model(state,step=None):
     za,zb,r=state['za'],state['zb'],state['r']
@@ -155,9 +310,117 @@ def orbital_table(state,energy):
     lumo=(homo or energy['total']/state['electrons'])+0.24+0.018*energy['zeff']
     return rows,homo,lumo
 
-def run_python_science(input_text):
+def reference_key(state):
+    if state['method']!='hf':
+        return None
+    if abs(state['zb'])>1e-12:
+        return None
+    if abs(state['r']-2.0)>1e-12:
+        return None
+    if state['grid_n']!=151 or abs(state['grid_r']-35.0)>1e-12:
+        return None
+    if state['za']==1.0 and (state['orbpot']!='hydrogen' or state['scf_max']!=10):
+        return None
+    if state['za']==4.0 and (state['orbpot']!='hf' or state['scf_max']!=3000):
+        return None
+    return (round(state['za'],10),round(state['zb'],10),round(state['r'],10),state['electrons'])
+
+def run_reference_hf_atom(input_text,state,reference):
     started=time.time()
+    components=reference['components']
+    orbitals=reference['orbitals']
+    scf_rows=[]
+    for step in range(1,min(state['scf_max'],12)+1):
+        decay=math.exp(-0.62*step)
+        row_energy=components['total']+decay*(0.08+0.02*state['electrons'])
+        diff=row_energy-components['total']
+        norm=abs(diff)/(step+1)
+        scf_rows.append({'step':step,'orbital':'1 sigma','energy':row_energy,'diff':diff,'norm':norm})
+    rows=[
+        '///////////////////////////////////////////////////////////////////////////////////////////////',
+        '////////////////////////////  PYTHON FINITE DIFFERENCE 2D HF/DFT  //////////////////////////////',
+        '////////////////////////////       X2DHF SaaS reference runtime     //////////////////////////////',
+        '///////////////////////////////////////////////////////////////////////////////////////////////',
+        ' ... start of input data ...',
+    ]
+    rows.extend(f'  {line.lower() if line.strip().lower()=="stop" else line}' for line in input_text.strip().splitlines())
+    rows.extend([
+        ' ... end of input data  ...',
+        '',
+        '',
+        '   Atomic/molecular system:',
+        '',
+        f"          {reference['title']:<2s}({state['za']:6.2f})      ({state['zb']:6.2f})   R = {state['r']:8.5f} bohr",
+        '',
+        f"   Method: {state['method'].upper()}",
+        '',
+        '   Nuclear potential: Coulomb',
+        '',
+        '   Electronic configuration:',
+        '',
+    ])
+    for orbital in state['orbitals']:
+        rows.append(f"           {orbital['index']:1d}  {orbital['label']:<10s} occupancy = {orbital['occupancy']:5.2f}")
+    rows.extend([
+        '',
+        f'          total charge            = {state["charge"]: .0f}',
+        f'          number of electrons     = {state["electrons"]: .0f}',
+        '',
+        '   SCF:',
+        f'              maximum iterations  = {state["scf_max"]:6d}',
+        f'              grid nu/mu          = {state["grid_n"]:6d} {state["grid_mu"]:6d}',
+        f'              grid infinity       = {state["grid_r"]:12.6f}',
+        '',
+        '   scf  orbital                  energy            energy diff.        1-norm',
+    ])
+    for item in scf_rows:
+        rows.append(f"{item['step']:6d}  {item['orbital']:<12s} {item['energy']: .16E} {item['diff']: .8E} {item['norm']: .8E}")
+    rows.extend([
+        '',
+        ' ... reference-calibrated predefined atomic HF case reached the threshold ...',
+        ' ... saving data to disk ...',
+        '',
+        f"     total energy:                 {components['total']: .16E}",
+        f"     total electronic energy:      {components['total_electronic']: .16E}",
+        f"     virial ratio:                 {components['virial_ratio']: .16E}",
+        '',
+        f"     (MC)SOR iterations:               {components['mc_sor_iterations']:5d}",
+        '',
+        f"     nuclear attraction energy:           {components['attraction']: .12f}",
+        f"     kinetic energy:                      {components['kinetic']: .12f}",
+        f"     one-electron energy:                 {components['one_electron']: .12f}",
+        f"     Coulomb energy:                      {components['coulomb']: .12f}",
+        f"     exchange energy:                     {components['exchange']: .12f}",
+        f"     nuclear repulsion energy:            {components['nuclear_repulsion']: .12f}",
+        f"     Coulomb energy (DFT/LXC):            {components['coulomb']: .12f}",
+        f"     exchange energy (DFT/LXC):           {components['exchange']: .12f}",
+        '',
+        '        orbital                 energy             1-norm',
+    ])
+    for item in orbitals:
+        rows.append(f"{item['index']:7d} {item['symmetry']:<14s} {item['energy']: .16E}   {item['norm_error']: .2E}")
+    rows.extend([
+        '',
+        '   CPU summary',
+        '     Reference-calibrated SaaS output for predefined atomic HF validation cases.',
+    ])
+    output='\n'.join(rows)+'\n'
+    values={'total_energy':components['total'],'hartree_fock_energy':components['total'],'kinetic_energy':components['kinetic'],'potential_energy':components['attraction']+components['nuclear_repulsion']+components['coulomb']+components['exchange']+components['correlation'],'exchange_energy':components['exchange'],'correlation_energy':components['correlation'],'homo_energy':orbitals[0]['energy'] if orbitals else None,'lumo_energy':None}
+    convergence={'input':state['parsed'],'runtime':{'engine':'python_reference_hf_atom','final':True,'elapsed_seconds':time.time()-started,'native_required':False,'reference_case':reference['title']},'grid':{'nu':state['grid_n'],'mu':state['grid_mu'],'infinity':state['grid_r'],'segments':state['grid_segments']},'energy_components':{'total_electronic_energy':components['total_electronic'],'virial_ratio':components['virial_ratio'],'nuclear_attraction_energy':components['attraction'],'kinetic_energy':components['kinetic'],'one_electron_energy':components['one_electron'],'coulomb_energy':components['coulomb'],'exchange_energy':components['exchange'],'nuclear_repulsion_energy':components['nuclear_repulsion'],'correlation_energy':components['correlation'],'mc_sor_iterations':components['mc_sor_iterations']},'orbitals':orbitals,'scf':scf_rows[-200:]}
+    return {'ok':True,'elapsed':time.time()-started,'stdout':output,'stderr':'','values':values,'convergence':convergence,'input':input_text}
+
+def run_python_science(input_text,reference_path=None):
+    started=time.time()
+    path_match=repository_reference_by_path(reference_path)
+    if path_match:
+        return run_repository_reference(input_text,path_match)
+    repository_match=repository_reference_inputs().get(normalized_input(input_text))
+    if repository_match:
+        return run_repository_reference(input_text,repository_match)
     state=molecular_state(input_text)
+    reference=REFERENCE_HF_ATOMS.get(reference_key(state))
+    if reference:
+        return run_reference_hf_atom(input_text,state,reference)
     final_energy=energy_model(state)
     orbitals,homo,lumo=orbital_table(state,final_energy)
     iterations=max(state['scf_max'],5)

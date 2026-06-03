@@ -2,8 +2,8 @@ import React from 'react';
 import {Outlet,NavLink,useNavigate}from'react-router-dom';
 import {useDispatch,useSelector}from'react-redux';
 import {logoutUser}from'../store/authSlice';
-import logo from'../assets/x2dhf-logo.png';
 
+const logo='/favicon.png';
 const baseLinks=[['/dashboard','Dashboard','01'],['/computations','Computations','02'],['/results','Results','03'],['/learn','Physics','04'],['/settings','Settings','05']];
 const adminLink=['/admin-dashboard','Admin','06'];
 const navClass=({isActive})=>`group flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition lg:gap-3 lg:px-4 lg:py-3 ${isActive?'border border-slate-950 bg-slate-950 text-white shadow-sm':'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}`;

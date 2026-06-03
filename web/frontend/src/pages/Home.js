@@ -1,8 +1,8 @@
 import React from 'react';
 import {Link} from 'react-router-dom';
 import QuantumBackdrop from '../components/QuantumBackdrop';
-import logo from '../assets/x2dhf-logo.png';
 
+const logo='/favicon.png';
 const features=['X2DHF-style input cards','HF, DFT, HFS, OED, TED, SCMC modes','Libxc-style functional labels','Live stdout and parsed energies','Saved user history','Admin analytics'];
 
 const Home=()=>(

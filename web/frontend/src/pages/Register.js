@@ -3,10 +3,10 @@ import {useDispatch,useSelector} from 'react-redux';
 import {useNavigate,Link} from 'react-router-dom';
 import {registerUser} from '../store/authSlice';
 import QuantumBackdrop from '../components/QuantumBackdrop';
-import logo from '../assets/x2dhf-logo.png';
 
 const validEmail=value=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const validPhone=value=>/^\+\d{11,13}$/.test(value.replace(/\s|-/g,''));
+const logo='/favicon.png';
 
 const Register=()=>{
  const [formData,setFormData]=useState({username:'',email:'',phone:'',password:''});

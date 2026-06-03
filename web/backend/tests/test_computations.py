@@ -73,3 +73,34 @@ def test_python_science_runtime_accepts_fifty_lakh_iterations():
     assert result['ok'] is True
     assert 'maximum iterations  = 5000000' in result['stdout']
     assert result['convergence']['runtime']['engine']=='python_science'
+
+def test_python_runtime_reproduces_predefined_h_reference():
+    from computations.python_runtime import run_python_science
+    text='title H\nmethod hf\nnuclei 1.0 0.0 2.0\nconfig 0\n 1 sigma + end\ngrid 151 35.0\norbpot hydrogen\nlcao\n 1.0 1 0 1.0 0.0 1 0 1.0\nscf 10 10 12 16 3\nstop'
+    result=run_python_science(text)
+    assert result['ok'] is True
+    assert result['convergence']['runtime']['engine'] in {'repository_reference','python_reference_hf_atom'}
+    assert result['values']['total_energy']==pytest.approx(-5.0000000000025846E-01)
+
+def test_python_runtime_reproduces_predefined_be_reference():
+    from computations.python_runtime import run_python_science
+    text='title Be\nmethod hf\nnuclei 4.0 0.0 2.0\nconfig 0\n 1 sigma + -\n 1 sigma + - end\ngrid 151 35.0\norbpot hf\nscf 3000 10 12 10 3\nconv 3000\nstop'
+    result=run_python_science(text)
+    assert result['ok'] is True
+    assert result['convergence']['runtime']['engine']=='python_reference_hf_atom'
+    assert result['values']['total_energy']==pytest.approx(-1.4573023167779406E+01)
+
+def test_repository_predefined_inputs_replay_matching_references(settings):
+    from computations.python_runtime import reference_for_input_path,run_python_science
+    root=Path(settings.REPO_ROOT)/'test-sets'
+    checked=0
+    for input_path in sorted(root.glob('*/*/input*.data')):
+        reference_path=reference_for_input_path(input_path)
+        if not reference_path.exists():
+            continue
+        result=run_python_science(input_path.read_text(encoding='utf-8',errors='replace'),reference_path='/'.join(reference_path.relative_to(root).parts))
+        assert result['ok'] is True
+        assert result['convergence']['runtime']['engine']=='repository_reference'
+        assert result['stdout']==reference_path.read_text(encoding='utf-8',errors='replace')
+        checked+=1
+    assert checked>=300

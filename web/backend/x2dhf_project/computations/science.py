@@ -34,11 +34,11 @@ stop""",
 method hf
 nuclei 4.0 0.0 2.0
 config 0
- 1 sigma +-
- 1 sigma +- end
+ 1 sigma + -
+ 1 sigma + - end
 grid 151 35.0
 orbpot hf
-scf 3000 10 12 18 3
+scf 3000 10 12 10 3
 conv 3000
 stop""",
     'Helium LDA DFT':"""title He
@@ -135,6 +135,9 @@ THEORY_GUIDE={
 def science_metadata():
     tests=[]
     root=Path(settings.X2DHF_DIRECTORY)/'test-sets'
-    for path in sorted(root.glob('*/*/input*.data'))[:100]:
-        tests.append({'name':'/'.join(path.relative_to(root).parts),'path':str(path),'input':path.read_text(encoding='utf-8',errors='replace')})
+    if not root.is_absolute():
+        root=Path(settings.REPO_ROOT)/'test-sets'
+    for path in sorted(root.glob('*/*/input*.data')):
+        reference=path.with_name('reference.lst') if path.name=='input.data' else path.with_name(path.name.replace('input','reference').replace('.data','.lst'))
+        tests.append({'name':'/'.join(path.relative_to(root).parts),'path':str(path),'reference_path':'/'.join(reference.relative_to(root).parts) if reference.exists() else '','input':path.read_text(encoding='utf-8',errors='replace')})
     return {'cards':CARD_HELP,'examples':EXAMPLES,'test_sets':tests,'theories':THEORY_GUIDE,'documents':[{'name':'X2DHF User Guide','url':'/api/core/docs/users-guide.pdf/'}]}

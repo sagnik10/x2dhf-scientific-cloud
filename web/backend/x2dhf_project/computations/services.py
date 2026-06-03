@@ -340,7 +340,8 @@ def run_engine(computation):
     output_path=workdir/'output.out' if is_qe else workdir/'output.dat'
     input_path.write_text(build_qe_input(computation) if is_qe else build_x2dhf_input(computation),encoding='utf-8')
     if not is_qe and getattr(settings,'PYTHON_SCIENCE_RUNTIME',True) and (not getattr(settings,'USE_NATIVE_X2DHF',False) or not native_available()):
-        return run_python_science(input_path.read_text(encoding='utf-8'))
+        params=parameter_map(computation)
+        return run_python_science(input_path.read_text(encoding='utf-8'),reference_path=params.get('x2dhf_reference_path'))
     started=time.time()
     output_handle=None
     try:

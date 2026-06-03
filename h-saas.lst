@@ -1,0 +1,84 @@
+
+///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////  PYTHON FINITE DIFFERENCE 2D HF/DFT  //////////////////////////////
+////////////////////////////             X2DHF SaaS runtime       //////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+ ... start of input data ...
+  title H
+  method hf
+  nuclei 1.0 0.0 2.0
+  config 0
+   1 sigma + end
+  grid 151 35.0
+  orbpot hydrogen
+  lcao
+   1.0 1 0 1.0 0.0 1 0 1.0
+  scf 10 10 12 16 3
+  stop
+ ... end of input data  ...
+
+
+   Atomic/molecular system: 
+   Explanation: ZA and ZB are the nuclear charges on the two prolate-spheroidal centres.
+   R is the internuclear separation used by the finite-difference runtime.
+
+          ZA(  1.00)      ZB(  0.00)   R =  2.00000 bohr
+
+   Method: HF
+   Explanation: HF selects the mean-field model. DFT/HFS modes add exchange-correlation terms from the functional card.
+
+   Nuclear potential: Coulomb
+
+   Electronic configuration:
+   Explanation: Occupation cards define orbital symmetry and electron filling. The final card usually carries end.
+
+           1  sigma +    occupancy =  1.00
+
+          total charge            =  0
+          number of electrons     =  1
+
+   SCF: 
+   Explanation: SCF repeatedly updates orbitals and potentials until energy and norm changes are small.
+              maximum iterations  =     10
+              grid segments       =      1
+              grid nu/mu          =    151    151
+              grid infinity       =    35.000000
+
+   scf  orbital                  energy            energy diff.        1-norm
+     1  sigma +      -3.4885819319285538E-01  8.28916597E-02  4.14458299E-02
+     2  sigma +      -3.7889579713740806E-01  5.28540558E-02  1.76180186E-02
+     3  sigma +      -3.9804861901972005E-01  3.37012339E-02  8.42530847E-03
+     4  sigma +      -4.1026099743487970E-01  2.14888555E-02  4.29777109E-03
+     5  sigma +      -4.1804795371064357E-01  1.37018992E-02  2.28364987E-03
+     6  sigma +      -4.2301313624751846E-01  8.73671666E-03  1.24810238E-03
+     7  sigma +      -4.2617907641097075E-01  5.57077649E-03  6.96347062E-04
+     8  sigma +      -4.2819776898553791E-01  3.55208392E-03  3.94675991E-04
+     9  sigma +      -4.2948494420055178E-01  2.26490870E-03  2.26490870E-04
+    10  sigma +      -4.3030568335371444E-01  1.44416955E-03  1.31288141E-04
+
+     Energy explanation:
+       total electronic energy excludes nuclear repulsion.
+       total energy includes electronic terms and nuclear repulsion.
+       kinetic, attraction, Coulomb, exchange, and correlation are stored separately.
+     total electronic energy: -4.3174985290368595E-01
+     total energy:            -4.3174985290368595E-01
+     virial ratio:            -2.0000000000000000E+00
+
+     nuclear attraction energy:        -0.793937682803
+     kinetic energy:                    0.427128597337
+     one-electron energy:              -0.366809085466
+     Coulomb energy:                    0.000000000000
+     exchange energy:                  -0.064940767438
+     correlation energy:                0.000000000000
+     nuclear repulsion energy:          0.000000000000
+
+     Orbital explanation: HOMO is the highest occupied molecular orbital, LUMO is the next available virtual orbital.
+     HOMO energy = -0.146051897471
+     LUMO energy =  0.110783245386
+
+        orbital                 energy             1-norm
+       1 sigma +      -1.4605189747074684E-01  1.00000000E-06
+
+   CPU summary
+     Python runtime wall time is reported by Django job metadata.
+     Long SCF requests are streamed as representative convergence rows in the web console.

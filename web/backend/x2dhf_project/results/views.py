@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter,OrderingFilter
-from django.http import FileResponse
+from django.http import FileResponse,HttpResponse
 import csv,json
 from .models import ComputationResult,ResultVisualization,Export
 from .serializers import ComputationResultSerializer,ResultVisualizationSerializer,ExportSerializer
@@ -23,6 +23,11 @@ class ComputationResultViewSet(viewsets.ModelViewSet):
         result=self.get_object()
         if result.result_file:
             return FileResponse(result.result_file.open('rb'),as_attachment=True,filename=f"result_{result.id}.dat")
+        if result.output_log:
+            title=''.join(char if char.isalnum() or char in ('-','_') else '_' for char in result.computation.title).strip('_') or f'result_{result.id}'
+            response=HttpResponse(result.output_log,content_type='text/plain; charset=utf-8')
+            response['Content-Disposition']=f'attachment; filename="{title}_{result.id}.lst"'
+            return response
         return Response({'error':'No file available'},status=status.HTTP_404_NOT_FOUND)
     @action(detail=True,methods=['post'])
     def export(self,request,pk=None):

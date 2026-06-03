@@ -1,0 +1,114 @@
+///////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////  PYTHON FINITE DIFFERENCE 2D HF/DFT  //////////////////////////////
+////////////////////////////             X2DHF SaaS runtime       //////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+ ... start of input data ...
+  title Be
+  method hf
+  nuclei 4.0 0.0 2.0
+  config 0
+   1 sigma +-
+   1 sigma +- end
+  grid 151 35.0
+  orbpot hf
+  lcao
+   1.0 1 0 1.0 0.0 1 0 1.0
+  scf 3000 10 12 18 3
+  conv 3000
+  stop
+ ... end of input data  ...
+
+
+   Atomic/molecular system: 
+   Explanation: ZA and ZB are the nuclear charges on the two prolate-spheroidal centres.
+   R is the internuclear separation used by the finite-difference runtime.
+
+          ZA(  4.00)      ZB(  0.00)   R =  2.00000 bohr
+
+   Method: HF
+   Explanation: HF selects the mean-field model. DFT/HFS modes add exchange-correlation terms from the functional card.
+
+   Nuclear potential: Coulomb
+
+   Electronic configuration:
+   Explanation: Occupation cards define orbital symmetry and electron filling. The final card usually carries end.
+
+           1  sigma +    occupancy =  2.00
+           2  sigma +    occupancy =  2.00
+
+          total charge            =  0
+          number of electrons     =  4
+
+   SCF: 
+   Explanation: SCF repeatedly updates orbitals and potentials until energy and norm changes are small.
+              maximum iterations  =   3000
+              grid segments       =      1
+              grid nu/mu          =    151    151
+              grid infinity       =    35.000000
+
+   scf  orbital                  energy            energy diff.        1-norm
+     1  sigma +       5.2145390969329162E+00  1.02020504E-01  5.10102521E-02
+     2  sigma +       5.1775697382319281E+00  6.50511456E-02  2.16837152E-02
+     3  sigma +       5.1539970343767756E+00  4.14784417E-02  1.03696104E-02
+     4  sigma +       5.1389664147888867E+00  2.64478221E-02  5.28956442E-03
+     5  sigma +       5.1293824686033309E+00  1.68638759E-02  2.81064599E-03
+     6  sigma +       5.1232714747117925E+00  1.07528820E-02  1.53612601E-03
+     7  sigma +       5.1193749329721587E+00  6.85634030E-03  8.57042537E-04
+     8  sigma +       5.1168903882649994E+00  4.37179559E-03  4.85755066E-04
+     9  sigma +       5.1153061726157514E+00  2.78757994E-03  2.78757994E-04
+    10  sigma +       5.1142960321195519E+00  1.77743945E-03  1.61585404E-04
+    11  sigma +       5.1136519381020813E+00  1.13334543E-03  9.44454524E-05
+    12  sigma +       5.1132412456242511E+00  7.22652951E-04  5.55886885E-05
+    13  sigma +       5.1129793765387266E+00  4.60783865E-04  3.29131332E-05
+    14  sigma +       5.1128124014377576E+00  2.93808764E-04  1.95872510E-05
+    15  sigma +       5.1127059334127596E+00  1.87340739E-04  1.17087962E-05
+    16  sigma +       5.1126380464027728E+00  1.19453729E-04  7.02668996E-06
+    17  sigma +       5.1125947597340762E+00  7.61670606E-05  4.23150337E-06
+    18  sigma +       5.1125671589355255E+00  4.85662621E-05  2.55611906E-06
+    19  sigma +       5.1125495598893620E+00  3.09672159E-05  1.54836080E-06
+    20  sigma +       5.1125383382420866E+00  1.97455687E-05  9.40265174E-07
+    21  sigma +       5.1125311830038758E+00  1.25903304E-05  5.72287747E-07
+    22  sigma +       5.1125266206225612E+00  8.02794913E-06  3.49041266E-07
+    23  sigma +       5.1125237115197972E+00  5.11884636E-06  2.13285265E-07
+    24  sigma +       5.1125218565939781E+00  3.26392055E-06  1.30556822E-07
+    25  sigma +       5.1125206738410576E+00  2.08116762E-06  8.00449087E-08
+    26  sigma +       5.1125199196844981E+00  1.32701107E-06  4.91485580E-08
+    27  sigma +       5.1125194388130453E+00  8.46139613E-07  3.02192719E-08
+    28  sigma +       5.1125191321958701E+00  5.39522437E-07  1.86042220E-08
+    29  sigma +       5.1125189366881276E+00  3.44014695E-07  1.14671565E-08
+    30  sigma +       5.1125188120268863E+00  2.19353454E-07  7.07591786E-09
+    31  sigma +       5.1125187325393702E+00  1.39865937E-07  4.37081055E-09
+    32  sigma +       5.1125186818558914E+00  8.91824588E-08  2.70249875E-09
+    33  sigma +       5.1125186495386794E+00  5.68652467E-08  1.67250726E-09
+    34  sigma +       5.1125186289323148E+00  3.62588821E-08  1.03596806E-09
+    35  sigma +       5.1125186157931166E+00  2.31196839E-08  6.42213443E-10
+    36  sigma +       5.1125186074151943E+00  1.47417616E-08  3.98425989E-10
+    37  sigma +       5.1125186020731945E+00  9.39976186E-09  2.47362154E-10
+
+     Energy explanation:
+       total electronic energy excludes nuclear repulsion.
+       total energy includes electronic terms and nuclear repulsion.
+       kinetic, attraction, Coulomb, exchange, and correlation are stored separately.
+     total electronic energy:  5.1125185926734327E+00
+     total energy:             5.1125185926734327E+00
+     virial ratio:            -2.0000000000000000E+00
+
+     nuclear attraction energy:        -12.703002924855
+     kinetic energy:                    17.994061264349
+     one-electron energy:               5.291058339495
+     Coulomb energy:                    1.069565217391
+     exchange energy:                  -1.248104964212
+     correlation energy:                0.000000000000
+     nuclear repulsion energy:          0.000000000000
+
+     Orbital explanation: HOMO is the highest occupied molecular orbital, LUMO is the next available virtual orbital.
+     HOMO energy = -0.636416714137
+     LUMO energy = -0.341781571279
+
+        orbital                 energy             1-norm
+       1 sigma +      -1.8813692752022761E+00  1.00000000E-06
+       2 sigma +      -6.3641671413663514E-01  1.00000000E-07
+
+   CPU summary
+     Python runtime wall time is reported by Django job metadata.
+     Long SCF requests are streamed as representative convergence rows in the web console.

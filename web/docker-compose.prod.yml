@@ -39,6 +39,8 @@ services:
       STRIPE_SECRET_KEY: sk_test_xxxxx
       X2DHF_DIRECTORY: /opt/x2dhf
       X2DHF_BINARY_PATH: /opt/x2dhf/bin/xhf
+      USE_NATIVE_X2DHF: "True"
+      PYTHON_SCIENCE_RUNTIME: "True"
     ports:
       - "8000:8000"
     depends_on:
@@ -69,6 +71,8 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       X2DHF_DIRECTORY: /opt/x2dhf
       X2DHF_BINARY_PATH: /opt/x2dhf/bin/xhf
+      USE_NATIVE_X2DHF: "True"
+      PYTHON_SCIENCE_RUNTIME: "True"
     depends_on:
       db:
         condition: service_healthy

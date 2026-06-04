@@ -116,7 +116,7 @@ class ComputationViewSet(viewsets.ModelViewSet):
             return Response(start_native_build(mode))
         except Exception as exc:
             messages=getattr(exc,'messages',None)
-            return Response({'started':False,'error':'\n'.join(messages) if messages else str(exc),**native_build_status()},status=status.HTTP_400_BAD_REQUEST)
+            return Response({'started':False,'blocked':True,'error':'\n'.join(messages) if messages else str(exc),**native_build_status()},status=status.HTTP_200_OK)
 
     @action(detail=False,methods=['post'])
     def parse_input(self,request):

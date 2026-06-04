@@ -30,9 +30,9 @@ const Dashboard=()=>{
   <section className="rounded-lg border border-slate-200 bg-white p-7 shadow-sm">
    <div className="flex flex-wrap items-center justify-between gap-4">
     <div>
-     <div className="mb-2 font-mono text-xs uppercase tracking-[.32em] text-blue-700">Python X2DHF Command Deck</div>
+     <div className="mb-2 font-mono text-xs uppercase tracking-[.32em] text-blue-700">X2DHF Command Deck</div>
      <h1 className="text-4xl font-black tracking-tight text-slate-950">Quantum Runtime Dashboard</h1>
-     <p className="mt-2 max-w-2xl text-slate-600">Live scientific telemetry for HF, DFT, SCF convergence, stored results, and molecule experiments.</p>
+     <p className="mt-2 max-w-2xl text-slate-600">Live telemetry for native X2DHF finite-difference jobs, SCF convergence, stored results, and molecule experiments.</p>
     </div>
     <div className="flex flex-wrap items-center gap-3">
      <div className="rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-700">{Math.round(analytics?.cpu_time_seconds||0)} CPU seconds used</div>

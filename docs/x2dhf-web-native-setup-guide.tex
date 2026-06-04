@@ -1,0 +1,220 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,margin=1.8cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{array}
+
+\definecolor{xblue}{HTML}{0EA5E9}
+\definecolor{xnavy}{HTML}{0F172A}
+\definecolor{xgreen}{HTML}{059669}
+\definecolor{xamber}{HTML}{D97706}
+\definecolor{xred}{HTML}{DC2626}
+\definecolor{xlight}{HTML}{F8FAFC}
+\definecolor{xline}{HTML}{CBD5E1}
+\definecolor{xcode}{HTML}{020617}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=xblue,
+  urlcolor=xblue
+}
+
+\titleformat{\section}{\Large\bfseries\color{xnavy}}{}{0pt}{}
+\titleformat{\subsection}{\large\bfseries\color{xblue}}{}{0pt}{}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textcolor{xblue}{X2DHF Web Native Runtime}}
+\rhead{\textcolor{xnavy}{Setup Guide}}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\lstdefinestyle{xcmd}{
+  backgroundcolor=\color{xcode},
+  basicstyle=\ttfamily\small\color{white},
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{xline},
+  xleftmargin=0pt,
+  framexleftmargin=6pt,
+  framexrightmargin=6pt,
+  framextopmargin=6pt,
+  framexbottommargin=6pt,
+  columns=fullflexible
+}
+
+\newtcolorbox{xbox}[2]{
+  colback=#1!7,
+  colframe=#1!70!black,
+  title=\textbf{#2},
+  arc=2mm,
+  boxrule=0.7pt,
+  left=2mm,
+  right=2mm,
+  top=1mm,
+  bottom=1mm
+}
+
+\begin{document}
+
+\begin{center}
+{\Huge\bfseries\color{xnavy} X2DHF Native Web Runtime}\\[3mm]
+{\Large\color{xblue} Complete Setup and Operating Guidelines}\\[2mm]
+{\color{xnavy} Django and React web interface for the original Fortran/C finite-difference X2DHF engine}
+\end{center}
+
+\vspace{3mm}
+
+\begin{xbox}{xgreen}{Goal}
+The application must be usable from any browser while the native X2DHF solver runs on a Linux-capable backend. Windows users do not run the Fortran binary directly. They either use a deployed Linux or Docker server, or run a local Windows development setup through WSL.
+\end{xbox}
+
+\section{Runtime Architecture}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{3.5cm}X}
+Frontend & React user interface served by Django or by a frontend container. \\
+Backend & Django REST API, authentication, job submission, result storage, and runtime status. \\
+Worker & Celery worker runs submitted jobs asynchronously when Redis is configured. \\
+Native engine & Original X2DHF Fortran/C binaries built by \texttt{x2dhfctl}. \\
+Wrapper & \texttt{bin/xhf} runs input decks and writes the native X2DHF listing to stdout. \\
+Database & SQLite for local development, PostgreSQL for production. \\
+Queue & Redis for production asynchronous execution. \\
+\end{tabularx}
+
+\section{Recommended Deployment}
+
+\begin{xbox}{xblue}{Best path for all users}
+Deploy the web application on a Linux or Docker backend. The server builds X2DHF once, and every user accesses the application through a browser. This is the correct public SaaS model.
+\end{xbox}
+
+\subsection{Docker Deployment}
+
+\begin{lstlisting}[style=xcmd]
+cd C:\Users\Administrator\Downloads\x2dhf-main-website\x2dhf-main\web
+docker compose -f docker-compose.prod.yml up --build
+\end{lstlisting}
+
+\begin{xbox}{xamber}{If Docker is missing}
+Install Docker Desktop, or use the WSL setup path below. The browser interface can still be used locally through Django, but native X2DHF requires Linux support.
+\end{xbox}
+
+\section{Windows Setup Without Docker}
+
+\begin{xbox}{xblue}{What happens on Windows}
+Windows hosts the Django website. WSL hosts the native Linux runtime. Django calls WSL when it needs to build or run X2DHF. The end user still works only in the browser.
+\end{xbox}
+
+\subsection{One-Time Setup}
+
+\begin{lstlisting}[style=xcmd]
+cd C:\Users\Administrator\Downloads\x2dhf-main-website\x2dhf-main
+.\web\scripts\setup-native-wsl.ps1 -BuildMode basic
+\end{lstlisting}
+
+\subsection{Libxc DFT Setup}
+
+\begin{lstlisting}[style=xcmd]
+.\web\scripts\setup-native-wsl.ps1 -BuildMode libxc
+\end{lstlisting}
+
+\subsection{Important Windows Step}
+
+\begin{xbox}{xamber}{Ubuntu first launch}
+After \texttt{wsl --install -d Ubuntu}, open Ubuntu once from the Windows Start Menu and complete the Linux username and password creation. Then return to the website and press \textbf{Install Linux Deps}.
+\end{xbox}
+
+\section{Run the Website Locally}
+
+\begin{lstlisting}[style=xcmd]
+cd C:\Users\Administrator\Downloads\x2dhf-main-website\x2dhf-main
+.\web\backend\.venv\Scripts\Activate.ps1
+python manage.py runserver
+\end{lstlisting}
+
+\begin{xbox}{xgreen}{Local URL}
+Open \href{http://127.0.0.1:8000/}{http://127.0.0.1:8000/}. Login, open Computations, confirm that Native X2DHF Runtime says \textbf{native ready}, then submit jobs.
+\end{xbox}
+
+\section{Website Setup Buttons}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{4cm}X}
+Install Ubuntu WSL & Starts Ubuntu installation on Windows. A restart may be required. \\
+Install Linux Deps & Installs compilers, CMake, BLAS, LAPACK, gawk, bc, wget, and certificates inside WSL. \\
+Build Native HF & Runs \texttt{./x2dhfctl -b}. \\
+Build Native Libxc & Runs \texttt{./x2dhfctl -L} and then \texttt{./x2dhfctl -b -l}. \\
+Build Native OpenMP & Runs \texttt{./x2dhfctl -L} and then \texttt{./x2dhfctl -b -l -o}. \\
+\end{tabularx}
+
+\section{Runtime Rules}
+
+\begin{enumerate}[leftmargin=*]
+\item Native mode is the default with \texttt{USE\_NATIVE\_X2DHF=True}.
+\item Python is used for orchestration, API handling, parsing, and result storage.
+\item The Python surrogate is disabled unless \texttt{USE\_NATIVE\_X2DHF=False}.
+\item Native X2DHF output is stored from stdout as \texttt{output.lst}.
+\item Jobs should not start until the runtime card reports \textbf{native ready}.
+\end{enumerate}
+
+\section{Verification Commands}
+
+\subsection{Backend Tests}
+
+\begin{lstlisting}[style=xcmd]
+web\backend\.venv\Scripts\python.exe -m pytest web/backend/tests/test_computations.py web/backend/tests/test_results.py -q
+\end{lstlisting}
+
+\subsection{Frontend Build}
+
+\begin{lstlisting}[style=xcmd]
+cd web\frontend
+npm run build
+\end{lstlisting}
+
+\subsection{Native Binary Check in WSL}
+
+\begin{lstlisting}[style=xcmd]
+wsl bash -lc "cd /mnt/c/Users/Administrator/Downloads/x2dhf-main-website/x2dhf-main && ls -l bin/x2dhf*"
+\end{lstlisting}
+
+\subsection{Run an Original Test Case}
+
+\begin{lstlisting}[style=xcmd]
+wsl bash -lc "cd /mnt/c/Users/Administrator/Downloads/x2dhf-main-website/x2dhf-main && source .x2dhfrc && testctl run h/set-01 && testctl summary"
+\end{lstlisting}
+
+\section{Troubleshooting}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{4.5cm}X}
+\textcolor{xred}{docker not found} & Docker Desktop is not installed or not on PATH. Use WSL setup or install Docker Desktop. \\
+\textcolor{xred}{WSL has no distribution} & Run Install Ubuntu WSL, restart if required, then open Ubuntu once from Start Menu. \\
+\textcolor{xred}{Install Linux Deps disabled} & Ubuntu WSL is not ready yet. Finish Ubuntu first launch. \\
+\textcolor{xred}{Build required} & Dependencies may be installed, but X2DHF binaries are not built yet. Press Build Native HF or Build Native Libxc. \\
+\textcolor{xred}{Job failed immediately} & Check Runtime Output and native build log. Confirm \texttt{bin/x2dhf-s} or another native binary exists. \\
+\end{tabularx}
+
+\section{Production Checklist}
+
+\begin{enumerate}[leftmargin=*]
+\item Set a strong Django \texttt{SECRET\_KEY}.
+\item Use PostgreSQL and Redis for production.
+\item Build the backend image with native X2DHF included.
+\item Keep \texttt{USE\_NATIVE\_X2DHF=True}.
+\item Use HTTPS at the public domain.
+\item Create staff users through Django admin or management command.
+\item Run a small native X2DHF test before opening access to users.
+\item Monitor job logs, runtime output, and storage usage.
+\end{enumerate}
+
+\begin{xbox}{xgreen}{Final State}
+When setup is complete, the site is a browser interface for the original X2DHF finite-difference Fortran/C solver. Windows, macOS, and Linux users can all use it through the web because the native solver runs on the backend.
+\end{xbox}
+
+\end{document}

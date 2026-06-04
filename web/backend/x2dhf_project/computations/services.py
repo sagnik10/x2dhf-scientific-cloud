@@ -1,6 +1,7 @@
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import threading
@@ -136,7 +137,7 @@ def wsl_status():
         names=[name for name in names if name and 'Windows Subsystem for Linux has no installed distributions' not in name]
         if result.returncode==0 and names:
             return {'required':True,'available':True,'ready':True,'distributions':names,'message':'WSL distribution available'}
-        message=(result.stderr or result.stdout or 'WSL has no installed Linux distribution').replace('\x00','').strip()
+        message=(result.stderr or result.stdout or 'WSL has no installed Linux distribution').replace('\x00','').strip() or 'WSL has no installed Linux distribution'
         return {'required':True,'available':True,'ready':False,'distributions':[],'message':message}
     except Exception as exc:
         return {'required':True,'available':True,'ready':False,'distributions':[],'message':str(exc)}
@@ -161,30 +162,33 @@ def native_runtime_status():
     wrapper=(root/'bin'/'xhf').exists()
     wsl=wsl_status()
     ready=bool(binaries) and (platform.system().lower()!='windows' or wsl.get('ready'))
+    docker_path=shutil.which('docker')
     return {
         'ready':ready,
         'os':platform.system(),
         'root':str(root),
+        'docker_available':bool(docker_path),
         'wrapper_present':wrapper,
         'compiled_binaries':binaries,
         'missing_binaries':[] if binaries else candidates,
         'wsl':wsl,
         'build_commands':{
-            'install_wsl':'wsl --install -d Ubuntu',
-            'install_deps':'apt-get update && apt-get install -y build-essential gfortran cmake make gcc g++ libblas-dev liblapack-dev wget ca-certificates',
+            'install_wsl':'Run from Administrator PowerShell: wsl --install --no-distribution; restart if prompted; wsl --install -d Ubuntu; launch Ubuntu once.',
+            'install_deps':'apt-get update && apt-get install -y build-essential gfortran cmake make gcc g++ gawk bc libblas-dev liblapack-dev wget ca-certificates',
             'basic':'./x2dhfctl -b',
             'libxc':'./x2dhfctl -L && ./x2dhfctl -b -l',
             'openmp_libxc':'./x2dhfctl -L && ./x2dhfctl -b -l -o',
-            'windows_wsl':'Use the setup buttons below: Install Ubuntu WSL, Install Linux dependencies, then Build Libxc DFT.'
+            'windows_wsl':'Enable WSL from Administrator PowerShell, create the Ubuntu user once, then use this page to install Linux dependencies and build X2DHF.',
+            'docker':'docker compose -f web/docker-compose.prod.yml up --build'
         },
         'sources':native_source_summary(),
         'python_runtime':{
             'ready':bool(getattr(settings,'PYTHON_SCIENCE_RUNTIME',True)),
             'engine':'python_science',
             'primary':not bool(getattr(settings,'USE_NATIVE_X2DHF',False)),
-            'message':'Primary Python science runtime is ready for web-based HF and DFT execution.'
+            'message':'Python surrogate/reference replay is available only when USE_NATIVE_X2DHF=False.'
         },
-        'message':'Native runtime ready' if ready else 'Native runtime is not ready: install a Linux runtime and build the Fortran/C binary into bin/.'
+        'message':'Native runtime ready' if ready else ('Native runtime is not ready. On Windows, install Ubuntu WSL, install Linux dependencies, then build X2DHF. Docker is optional.' if platform.system().lower()=='windows' else 'Native runtime is not ready: install Linux dependencies and build the Fortran/C binary into bin/.')
     }
 
 def native_build_log_path():
@@ -200,19 +204,14 @@ def native_build_command(mode='basic'):
         'openmp_libxc':'./x2dhfctl -L && ./x2dhfctl -b -l -o',
     }
     if mode=='install_wsl':
-        if platform.system().lower()!='windows':
-            raise ValidationError('WSL installation is only needed on Windows.')
-        script="Start-Process -FilePath wsl.exe -ArgumentList '--install','-d','Ubuntu' -Verb RunAs -Wait"
-        if not shutil.which('wsl.exe'):
-            script="Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart; Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart; wsl --install -d Ubuntu' -Verb RunAs -Wait"
-        return ['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-Command',script]
+        raise ValidationError('WSL/Ubuntu cannot be installed reliably from the website because Windows optional features, restarts, UAC, and BIOS virtualization may be required. Run `wsl --install --no-distribution` from Administrator PowerShell, restart if prompted, run `wsl --install -d Ubuntu`, launch Ubuntu once, then return here.')
     if mode=='install_deps':
-        packages='build-essential gfortran cmake make gcc g++ libblas-dev liblapack-dev wget ca-certificates'
+        packages='build-essential gfortran cmake make gcc g++ gawk bc libblas-dev liblapack-dev wget ca-certificates'
         script=f'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y {packages}'
         if platform.system().lower()=='windows':
             status=wsl_status()
             if not status.get('ready'):
-                raise ValidationError('Install Ubuntu WSL first, then restart if Windows asks, reopen runserver, and press Install Linux dependencies.')
+                raise ValidationError(f"{status.get('message')}. Install Ubuntu WSL manually from Administrator PowerShell, launch Ubuntu once, then press Install Linux dependencies.")
             return ['wsl.exe','-u','root','bash','-lc',script]
         return ['bash','-lc',f'command -v apt-get >/dev/null && sudo {script} || true']
     script=commands.get(mode,commands['basic'])
@@ -279,11 +278,21 @@ def native_available():
         return False
     return any((root/'bin'/name).exists() for name in candidates)
 
-def command_for(computation,input_path,output_path):
+def command_for(computation,input_path,output_path,workdir):
     if computation.theory=='qe':
         return [executable_path(settings.QE_BINARY_PATH),'-in',str(input_path)], output_path.open('w')
     ensure_x2dhf_build()
-    return bash_command(settings.X2DHF_BINARY_PATH,[input_path.stem,output_path.stem]), subprocess.PIPE
+    output_prefix=output_path.with_suffix('').name
+    stdout=output_path.open('w',encoding='utf-8',errors='replace')
+    if platform.system().lower()=='windows' and shutil.which('wsl.exe'):
+        script=' && '.join([
+            f'cd {shlex.quote(windows_to_wsl_path(workdir))}',
+            f'export X2DHF_DIRECTORY={shlex.quote(windows_to_wsl_path(settings.X2DHF_DIRECTORY))}',
+            f'export PATH="$X2DHF_DIRECTORY/bin:$PATH"',
+            f'{shlex.quote(windows_to_wsl_path(settings.X2DHF_BINARY_PATH))} {shlex.quote(input_path.stem)} {shlex.quote(output_prefix)}',
+        ])
+        return ['wsl.exe','bash','-lc',script], stdout
+    return bash_command(settings.X2DHF_BINARY_PATH,[input_path.stem,output_prefix]), stdout
 
 def runtime_env():
     env=os.environ.copy()
@@ -337,17 +346,16 @@ def run_engine(computation):
     workdir.mkdir(parents=True)
     is_qe=computation.theory=='qe'
     input_path=workdir/'input.in' if is_qe else workdir/'input.data'
-    output_path=workdir/'output.out' if is_qe else workdir/'output.dat'
+    output_path=workdir/'output.out' if is_qe else workdir/'output.lst'
     input_path.write_text(build_qe_input(computation) if is_qe else build_x2dhf_input(computation),encoding='utf-8')
-    if not is_qe and getattr(settings,'PYTHON_SCIENCE_RUNTIME',True) and (not getattr(settings,'USE_NATIVE_X2DHF',False) or not native_available()):
+    if not is_qe and getattr(settings,'PYTHON_SCIENCE_RUNTIME',True) and not getattr(settings,'USE_NATIVE_X2DHF',True):
         params=parameter_map(computation)
         return run_python_science(input_path.read_text(encoding='utf-8'),reference_path=params.get('x2dhf_reference_path'))
     started=time.time()
     output_handle=None
     try:
-        command,stdout=command_for(computation,input_path,output_path)
-        if stdout is not subprocess.PIPE:
-            output_handle=stdout
+        command,stdout=command_for(computation,input_path,output_path,workdir)
+        output_handle=stdout
         input_text=input_path.read_text(encoding='utf-8')
         process=subprocess.Popen(command,cwd=workdir,env=runtime_env(),stdout=stdout,stderr=subprocess.PIPE,text=True)
         stderr_parts=[]

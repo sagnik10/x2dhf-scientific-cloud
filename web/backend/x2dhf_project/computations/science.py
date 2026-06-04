@@ -5,7 +5,7 @@ from django.conf import settings
 CARD_HELP={
     'title':{'meaning':'Case title written into output and data files.','format':'title text'},
     'method':{'meaning':'Calculation type: HF, DFT, HFS, OED, TED, or SCMC.','format':'method hf|dft|hfs|oed|ted|scmc'},
-    'dft':{'meaning':'Python DFT exchange-correlation functional label. Examples include xc_lda_x, xc_gga_x_b88, xc_gga_c_lyp, lda, b88, lyp, vwn.','format':'dft functional [functional]'},
+    'dft':{'meaning':'DFT exchange-correlation functional label used by native X2DHF Libxc builds or preserved in surrogate mode. Examples include xc_lda_x, xc_gga_x_b88, xc_gga_c_lyp, lda, b88, lyp, vwn.','format':'dft functional [functional]'},
     'nuclei':{'meaning':'Nuclear charges of centres A and B and internuclear distance. Add angstrom when R is not in atomic units.','format':'nuclei ZA ZB R [angstrom]'},
     'config':{'meaning':'Total molecular charge followed by orbital occupation cards in inverse energy order. The deepest orbital card must contain end.','format':'config charge'},
     'grid':{'meaning':'Two-dimensional finite-difference grid. N_nu, optional N_mu or extra segment counts, and practical infinity define accuracy and cost.','format':'grid N_nu R_infinity or grid N_nu N_mu R_infinity'},
@@ -123,12 +123,12 @@ def parse_x2dhf_input(text):
     return {'title':title,'method':method,'functional':functional,'cards':cards,'missing':missing,'is_valid':len(missing)==0}
 
 THEORY_GUIDE={
-    'hf':{'name':'Hartree-Fock','summary':'Python Hartree-Fock-style molecular runtime with X2DHF-compatible cards and output sections.'},
-    'dft':{'name':'Python Density Functional Theory','summary':'Python DFT path using the dft card labels while preserving X2DHF sample compatibility and result structure.'},
-    'hfs':{'name':'Hartree-Fock-Slater','summary':'Python HFS mode using the same structured input and output parser pipeline.'},
-    'oed':{'name':'Optimized Effective Density','summary':'Python OED-compatible mode for density-driven effective potential workflows.'},
-    'ted':{'name':'Two-Electron Density','summary':'Python TED-compatible mode with saved cards, parsed energies, and runtime output.'},
-    'scmc':{'name':'SCMC','summary':'Python SCMC-compatible mode wired into the same web computation lifecycle.'},
+    'hf':{'name':'Hartree-Fock','summary':'Native X2DHF finite-difference Hartree-Fock execution through the web job runner.'},
+    'dft':{'name':'Density Functional Theory','summary':'Native X2DHF DFT execution when the Libxc-enabled binary is built; input cards and result parsing stay web-managed.'},
+    'hfs':{'name':'Hartree-Fock-Slater','summary':'Native X2DHF-compatible HFS mode wired through the same web computation lifecycle.'},
+    'oed':{'name':'Optimized Effective Density','summary':'Native X2DHF-compatible OED mode for density-driven effective potential workflows.'},
+    'ted':{'name':'Two-Electron Density','summary':'Native X2DHF-compatible TED mode with saved cards, parsed energies, and runtime output.'},
+    'scmc':{'name':'SCMC','summary':'Native X2DHF-compatible SCMC mode wired into the same web computation lifecycle.'},
     'qe':{'name':'Quantum Espresso-style DFT','summary':'Web form can preserve QE-style DFT metadata; primary local execution remains Python unless an external QE binary is configured.'},
 }
 

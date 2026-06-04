@@ -2,8 +2,10 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV X2DHF_DIRECTORY=/opt/x2dhf
 ENV X2DHF_BINARY_PATH=/opt/x2dhf/bin/xhf
+ENV USE_NATIVE_X2DHF=True
+ENV PYTHON_SCIENCE_RUNTIME=True
 WORKDIR /opt/x2dhf
-RUN apt-get update && apt-get install -y --no-install-recommends bash cmake make gcc gfortran postgresql-client libxc-dev quantum-espresso ncurses-bin && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends bash cmake make gcc g++ gfortran gawk bc wget ca-certificates postgresql-client libblas-dev liblapack-dev libxc-dev quantum-espresso ncurses-bin && rm -rf /var/lib/apt/lists/*
 COPY . /opt/x2dhf
 RUN chmod +x /opt/x2dhf/x2dhfctl /opt/x2dhf/bin/* && /opt/x2dhf/x2dhfctl -b
 WORKDIR /opt/x2dhf/web/backend

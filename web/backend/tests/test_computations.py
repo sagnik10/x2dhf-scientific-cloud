@@ -34,7 +34,20 @@ def test_missing_native_binary_reports_build_problem(settings,test_user,test_mol
     settings.X2DHF_BINARY_PATH=str(tmp_path/'bin'/'xhf')
     computation=Computation.objects.create(user=test_user,molecular_system=test_molecular_system,title='Native',theory='hf',spin_multiplicity=1,num_electrons=1)
     with pytest.raises(ValidationError) as exc:
-        command_for(computation,Path('input.data'),Path('output.dat'))
+        command_for(computation,Path('input.data'),Path('output.lst'),tmp_path)
+    assert 'Compiled X2DHF binary is missing' in str(exc.value) or 'WSL has no installed Linux distribution' in str(exc.value)
+
+@pytest.mark.django_db
+def test_native_mode_does_not_silently_fallback_to_python(settings,test_user,test_molecular_system,tmp_path):
+    settings.X2DHF_DIRECTORY=str(tmp_path)
+    settings.X2DHF_BINARY_PATH=str(tmp_path/'bin'/'xhf')
+    settings.COMPUTATION_WORKDIR=str(tmp_path/'work')
+    settings.PYTHON_SCIENCE_RUNTIME=True
+    settings.USE_NATIVE_X2DHF=True
+    computation=Computation.objects.create(user=test_user,molecular_system=test_molecular_system,title='Native required',theory='hf',spin_multiplicity=1,num_electrons=1)
+    computation.parameters.create(key='x2dhf_input',value='title H\nmethod hf\nnuclei 1.0 0.0 2.0\nconfig 0\n 1 sigma + end\ngrid 151 35.0\norbpot hydrogen\nscf 10 10 12 16 3\nstop')
+    with pytest.raises(ValidationError) as exc:
+        run_engine(computation)
     assert 'Compiled X2DHF binary is missing' in str(exc.value) or 'WSL has no installed Linux distribution' in str(exc.value)
 
 @pytest.mark.django_db
@@ -63,7 +76,9 @@ def test_python_science_runtime_completes_without_native_binary(settings,test_us
     computation.parameters.create(key='x2dhf_input',value='title H\nmethod hf\nnuclei 1.0 0.0 2.0\nconfig 0\n 1 sigma + end\ngrid 151 35.0\norbpot hydrogen\nscf 10 10 12 16 3\nstop')
     result=run_engine(computation)
     assert result['ok'] is True
-    assert 'PYTHON FINITE DIFFERENCE 2D HF/DFT' in result['stdout']
+    assert 'X2DHF REFERENCE RESULT REPLAY' in result['stdout']
+    assert 'Original test-set output, not a new calculation' in result['stdout']
+    assert 'PYTHON FINITE DIFFERENCE 2D HF/DFT' not in result['stdout']
     assert result['values']['total_energy'] is not None
 
 def test_python_science_runtime_accepts_fifty_lakh_iterations():
@@ -104,3 +119,13 @@ def test_repository_predefined_inputs_replay_matching_references(settings):
         assert result['stdout']==reference_path.read_text(encoding='utf-8',errors='replace')
         checked+=1
     assert checked>=300
+
+def test_python_surrogate_output_does_not_claim_native_x2dhf():
+    from computations.python_runtime import run_python_science
+    text='title Unmatched\nmethod hf\nnuclei 1.0 1.0 1.8\nconfig 0\n 1 sigma + - end\ngrid 99 20.0\norbpot hf\nscf 7 10 12 16 3\nstop'
+    result=run_python_science(text)
+    assert result['ok'] is True
+    assert result['convergence']['runtime']['engine']=='python_science'
+    assert 'PYTHON SURROGATE SCIENCE RUNTIME' in result['stdout']
+    assert 'not native X2DHF' in result['stdout']
+    assert 'PYTHON FINITE DIFFERENCE 2D HF/DFT' not in result['stdout']

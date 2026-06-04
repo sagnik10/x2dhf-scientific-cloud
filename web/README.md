@@ -45,6 +45,8 @@ Full-stack production-grade SaaS application for X2DHF quantum chemistry calcula
 - Python 3.11+ (for local development)
 - Node.js 18+ (for frontend development)
 
+If Docker is not installed on Windows, use WSL for the native X2DHF runtime. The website still runs in Django and users work from the browser.
+
 ### Development Setup
 
 ```bash
@@ -60,6 +62,24 @@ Access:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8000
 - Admin: http://localhost:8000/admin
+
+### Windows Setup Without Docker
+
+From the repository root:
+
+```powershell
+.\web\scripts\setup-native-wsl.ps1 -BuildMode basic
+.\web\backend\.venv\Scripts\Activate.ps1
+python manage.py runserver
+```
+
+For Libxc DFT support:
+
+```powershell
+.\web\scripts\setup-native-wsl.ps1 -BuildMode libxc
+```
+
+Normal users only need the browser. Native X2DHF runs on the Linux/WSL or Docker backend, not on each user's Windows machine.
 
 ### Production Deployment
 

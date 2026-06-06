@@ -39,7 +39,8 @@ services:
       STRIPE_SECRET_KEY: sk_test_xxxxx
       X2DHF_DIRECTORY: /opt/x2dhf
       X2DHF_BINARY_PATH: /opt/x2dhf/bin/xhf
-      USE_NATIVE_X2DHF: "True"
+      X2DHF_RUNTIME_MODE: "auto"
+      USE_NATIVE_X2DHF: "False"
       PYTHON_SCIENCE_RUNTIME: "True"
     ports:
       - "8000:8000"
@@ -71,7 +72,8 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       X2DHF_DIRECTORY: /opt/x2dhf
       X2DHF_BINARY_PATH: /opt/x2dhf/bin/xhf
-      USE_NATIVE_X2DHF: "True"
+      X2DHF_RUNTIME_MODE: "auto"
+      USE_NATIVE_X2DHF: "False"
       PYTHON_SCIENCE_RUNTIME: "True"
     depends_on:
       db:
@@ -86,7 +88,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     environment:
-      REACT_APP_API_URL: http://backend:8000/api
+      REACT_APP_API_URL: http://127.0.0.1:8000/api
     ports:
       - "3000:3000"
     depends_on:

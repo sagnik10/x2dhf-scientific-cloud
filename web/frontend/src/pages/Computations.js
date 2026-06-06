@@ -32,6 +32,9 @@ const Computations=()=>{
  const [building,setBuilding]=useState(false);
  const isWindows=nativeStatus?.os==='Windows';
  const wslReady=!!nativeStatus?.wsl?.ready;
+ const pythonReady=!!nativeStatus?.python_runtime?.ready;
+ const nativeReady=!!nativeStatus?.native_ready;
+ const runtimeReady=!!nativeStatus?.ready||pythonReady;
 
  const loadNative=()=>{
   computationAPI.getNativeStatus().then(response=>setNativeStatus(response.data)).catch(()=>setNativeStatus(null));
@@ -61,35 +64,35 @@ const Computations=()=>{
    <div className="flex flex-wrap items-center justify-between gap-4">
     <div>
      <h1 className="text-4xl font-bold text-slate-950">Computations</h1>
-     <p className="mt-1 text-slate-600">Web-managed native X2DHF finite-difference Hartree-Fock, HFS, OED, TED, SCMC, and DFT runtime.</p>
+     <p className="mt-1 text-slate-600">Web-managed X2DHF finite-difference Hartree-Fock, HFS, OED, TED, SCMC, and DFT runtime.</p>
     </div>
     <button onClick={()=>setShowForm(!showForm)} className="rounded-lg bg-cyan-500 px-6 py-2 font-semibold text-white shadow-sm hover:bg-cyan-600">{showForm?'Hide Input':'New Computation'}</button>
    </div>
 
    {nativeStatus&&(
-    <section className={`rounded-lg border bg-white p-5 shadow-sm ${nativeStatus.ready?'border-emerald-200':'border-amber-200'}`}>
+    <section className={`rounded-lg border bg-white p-5 shadow-sm ${runtimeReady?'border-emerald-200':'border-amber-200'}`}>
      <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
-       <h2 className="font-semibold text-slate-950">Native X2DHF Runtime</h2>
+       <h2 className="font-semibold text-slate-950">X2DHF Runtime</h2>
        <p className="mt-1 text-sm text-slate-600">{nativeStatus.message||'Checking native Fortran/C runtime'}</p>
        <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 md:grid-cols-3">
-        <span>Compiled binaries: {(nativeStatus.compiled_binaries||[]).join(', ')||'none'}</span>
+        <span>Executable native binaries: {(nativeStatus.compiled_binaries||[]).join(', ')||'none'}</span>
         <span>Fortran/C sources: {(nativeStatus.sources?.fortran?.count||0)+(nativeStatus.sources?.c?.count||0)}</span>
         <span>Sample inputs: {nativeStatus.sources?.inputs?.count||0}</span>
        </div>
       </div>
-      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${nativeStatus.ready?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-amber-200 bg-amber-50 text-amber-700'}`}>{nativeStatus.ready?'native ready':'build required'}</span>
+      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${runtimeReady?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-amber-200 bg-amber-50 text-amber-700'}`}>{nativeReady?'native active':pythonReady?'python runtime active':'build required'}</span>
      </div>
      {nativeStatus&&(
       <div className="mt-4 space-y-3">
-       <div className={`rounded border p-3 text-sm ${nativeStatus.ready?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>{nativeStatus.ready?'Jobs now run through the original X2DHF Fortran/C finite-difference engine on the server. Users only need the browser.':isWindows?'This Windows host needs a Linux runtime for the native solver. Use the setup buttons below, or deploy the app on a Linux/Docker server so all users can work from the browser.':'Build native X2DHF before submitting jobs. On a shared deployment this is done once in the Linux/Docker server image.'}</div>
+       <div className={`rounded border p-3 text-sm ${runtimeReady?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>{nativeReady?'Jobs now run through the original X2DHF Fortran/C finite-difference engine on the server. Users only need the browser.':pythonReady?'Jobs can run now through the Python reference/replay runtime. Build native X2DHF later if you need the original Fortran/C solver for every case.':isWindows?'This Windows host needs a Linux runtime for the native solver. Use the setup buttons below, or deploy the app on a Linux/Docker server so all users can work from the browser.':'Build native X2DHF before submitting jobs. On a shared deployment this is done once in the Linux/Docker server image.'}</div>
        <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
         <div className="rounded border border-slate-200 bg-slate-50 p-3"><div className="font-semibold text-slate-950">Recommended</div><p className="mt-1 text-slate-600">Deploy with Docker/Linux. The image builds X2DHF during setup and serves the app to every user.</p></div>
         <div className="rounded border border-slate-200 bg-slate-50 p-3"><div className="font-semibold text-slate-950">Windows Users</div><p className="mt-1 text-slate-600">Use the website from the browser. Native execution happens on the Linux backend, not on the Windows client.</p></div>
         <div className="rounded border border-slate-200 bg-slate-50 p-3"><div className="font-semibold text-slate-950">Local Dev</div><p className="mt-1 text-slate-600">Use Docker Desktop or WSL if you want to host the native runtime on your own machine.</p></div>
        </div>
-       {isWindows&&!nativeStatus.ready&&<div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800"><div className="font-semibold">Windows setup order</div><p className="mt-1">The website cannot enable Windows features, accept UAC prompts, restart Windows, or turn on BIOS virtualization. Do this prerequisite once, then the web app can install Linux packages and build native X2DHF.</p><ol className="mt-3 list-decimal space-y-1 pl-5">{windowsSetupCommands.map(item=><li key={item} className="font-mono text-xs text-blue-950">{item}</li>)}</ol><p className="mt-3 text-xs">Docker status: {nativeStatus.docker_available?'available on PATH':'not installed or not on PATH'}. WSL status: {wslReady?'Ubuntu ready':nativeStatus.wsl?.message||'not ready'}.</p></div>}
-       {isWindows&&!nativeStatus.ready&&<div className="flex flex-wrap gap-2"><button disabled={building||!wslReady} title={!wslReady?'Finish the Administrator PowerShell WSL steps and launch Ubuntu once first.':'Install Linux build packages inside Ubuntu WSL.'} onClick={()=>startBuild('install_deps')} className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">{building?'Working...':'Install Linux Deps'}</button></div>}
+       {isWindows&&!nativeReady&&<div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800"><div className="font-semibold">Windows setup order</div><p className="mt-1">The website cannot enable Windows features, accept UAC prompts, restart Windows, or turn on BIOS virtualization. Do this prerequisite once, then the web app can install Linux packages and build native X2DHF.</p><ol className="mt-3 list-decimal space-y-1 pl-5">{windowsSetupCommands.map(item=><li key={item} className="font-mono text-xs text-blue-950">{item}</li>)}</ol><p className="mt-3 text-xs">Docker status: {nativeStatus.docker_available?'available on PATH':'not installed or not on PATH'}. WSL status: {wslReady?'Ubuntu ready':nativeStatus.wsl?.message||'not ready'}.</p></div>}
+       {isWindows&&!nativeReady&&<div className="flex flex-wrap gap-2"><button disabled={building||!wslReady} title={!wslReady?'Finish the Administrator PowerShell WSL steps and launch Ubuntu once first.':'Install Linux build packages inside Ubuntu WSL.'} onClick={()=>startBuild('install_deps')} className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">{building?'Working...':'Install Linux Deps'}</button></div>}
        <div className="flex flex-wrap gap-2">
         {buildButtons.map(item=>{const disabled=building||(isWindows&&!wslReady);return <button key={item.mode} disabled={disabled} title={isWindows&&!wslReady?'Install and open Ubuntu WSL first.':item.label} onClick={()=>startBuild(item.mode)} className="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50">{building?'Building...':item.label}</button>;})}
        </div>
@@ -105,7 +108,7 @@ const Computations=()=>{
     </section>
    )}
 
-   {showForm&&<ComputationForm systems={systems} nativeReady={!!nativeStatus?.ready} onSubmitted={submitComplete} onClose={()=>{setShowForm(false);dispatch(fetchComputations());}}/>}
+   {showForm&&<ComputationForm systems={systems} nativeReady={runtimeReady} onSubmitted={submitComplete} onClose={()=>{setShowForm(false);dispatch(fetchComputations());}}/>}
    <div className="flex flex-wrap gap-2">{['all','pending','running','completed','failed'].map(status=><button key={status} onClick={()=>changeFilter(status)} className={`rounded-lg border px-4 py-2 capitalize ${filterStatus===status?'border-cyan-500 bg-cyan-50 text-cyan-700':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>{status}</button>)}</div>
    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">

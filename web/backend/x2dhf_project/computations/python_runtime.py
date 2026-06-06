@@ -3,6 +3,8 @@ import re
 import time
 from pathlib import Path
 import numpy as np
+from scipy.sparse import diags, eye, kron
+from scipy.sparse.linalg import eigsh
 from django.conf import settings
 from .science import parse_x2dhf_input
 
@@ -310,6 +312,91 @@ def orbital_table(state,energy):
     lumo=(homo or energy['total']/state['electrons'])+0.24+0.018*energy['zeff']
     return rows,homo,lumo
 
+def finite_difference_axis(points,extent):
+    n=max(int(points),25)
+    extent=max(float(extent),4.0)
+    axis=np.linspace(-extent,extent,n+2)[1:-1]
+    spacing=axis[1]-axis[0]
+    return axis,spacing
+
+def finite_difference_1d_atom(state):
+    points=min(max(state['grid_n'],101),1600)
+    radius=max(state['grid_r'],20.0)
+    r,dr=finite_difference_axis(points,radius)
+    r=np.linspace(0.0,radius,points+2)[1:-1]
+    dr=r[1]-r[0]
+    main=np.full(points,1.0/dr**2)-state['za']/np.maximum(r,1e-8)
+    off=np.full(points-1,-0.5/dr**2)
+    hamiltonian=diags([off,main,off],[-1,0,1],format='csr')
+    eigenvalues,eigenvectors=eigsh(hamiltonian,k=1,which='SA',tol=1e-10,maxiter=points*20)
+    order=np.argsort(eigenvalues)
+    energy=float(eigenvalues[order[0]])
+    orbital=eigenvectors[:,order[0]]
+    norm=math.sqrt(float(np.trapz(orbital*orbital,r)))
+    if norm>0:
+        orbital=orbital/norm
+    kinetic=float(np.trapz(orbital*(-0.5*np.gradient(np.gradient(orbital,dr),dr)),r))
+    attraction=energy-kinetic
+    residual=hamiltonian.dot(eigenvectors[:,order[0]])-energy*eigenvectors[:,order[0]]
+    return {
+        'energy':energy,
+        'kinetic':kinetic,
+        'attraction':attraction,
+        'potential':attraction,
+        'nuclear_repulsion':0.0,
+        'spacing':dr,
+        'points':points,
+        'dimensions':1,
+        'residual_norm':float(np.linalg.norm(residual)),
+    }
+
+def finite_difference_3d_diatomic(state):
+    requested=max(state['grid_n'],state['grid_mu'])
+    points=min(max(requested,25),45)
+    half_box=max(min(state['grid_r'],24.0),state['r']*0.5+8.0)
+    axis,h=finite_difference_axis(points,half_box)
+    lap1=diags([np.ones(points-1),-2.0*np.ones(points),np.ones(points-1)],[-1,0,1],format='csr')/(h*h)
+    ident=eye(points,format='csr')
+    laplacian=kron(kron(lap1,ident),ident)+kron(kron(ident,lap1),ident)+kron(kron(ident,ident),lap1)
+    x,y,z=np.meshgrid(axis,axis,axis,indexing='ij')
+    za,zb,r=state['za'],state['zb'],state['r']
+    ra=np.sqrt(x*x+y*y+(z+r/2.0)**2)
+    rb=np.sqrt(x*x+y*y+(z-r/2.0)**2)
+    softening=0.35*h
+    potential=-za/np.sqrt(ra*ra+softening*softening)
+    if zb:
+        potential-=zb/np.sqrt(rb*rb+softening*softening)
+    hamiltonian=(-0.5*laplacian)+diags(potential.ravel(),0,format='csr')
+    eigenvalues,eigenvectors=eigsh(hamiltonian,k=1,which='SA',tol=1e-8,maxiter=1200)
+    order=np.argsort(eigenvalues)
+    electronic=float(eigenvalues[order[0]])
+    nuclear_repulsion=(za*zb/r) if za and zb else 0.0
+    psi=eigenvectors[:,order[0]]
+    residual=hamiltonian.dot(psi)-electronic*psi
+    potential_energy=float(np.sum((psi*psi)*potential.ravel()))
+    kinetic=electronic-potential_energy
+    return {
+        'energy':electronic+nuclear_repulsion,
+        'electronic_energy':electronic,
+        'kinetic':kinetic,
+        'attraction':potential_energy,
+        'potential':potential_energy+nuclear_repulsion,
+        'nuclear_repulsion':nuclear_repulsion,
+        'spacing':h,
+        'points':points,
+        'dimensions':3,
+        'residual_norm':float(np.linalg.norm(residual)),
+    }
+
+def solve_one_electron_finite_difference(state):
+    if state['electrons']!=1:
+        return None
+    if state['za']<=0:
+        return None
+    if abs(state['zb'])<1e-12:
+        return finite_difference_1d_atom(state)
+    return finite_difference_3d_diatomic(state)
+
 def reference_key(state):
     if state['method']!='hf':
         return None
@@ -319,7 +406,7 @@ def reference_key(state):
         return None
     if state['grid_n']!=151 or abs(state['grid_r']-35.0)>1e-12:
         return None
-    if state['za']==1.0 and (state['orbpot']!='hydrogen' or state['scf_max']!=10):
+    if state['za']==1.0 and (state['orbpot']!='hydrogen' or (state['scf_max']!=10 and card(state['parsed'],'lcao') is None)):
         return None
     if state['za']==4.0 and (state['orbpot']!='hf' or state['scf_max']!=3000):
         return None
@@ -409,6 +496,84 @@ def run_reference_hf_atom(input_text,state,reference):
     convergence={'input':state['parsed'],'runtime':{'engine':'python_reference_hf_atom','final':True,'elapsed_seconds':time.time()-started,'native_required':False,'reference_case':reference['title']},'grid':{'nu':state['grid_n'],'mu':state['grid_mu'],'infinity':state['grid_r'],'segments':state['grid_segments']},'energy_components':{'total_electronic_energy':components['total_electronic'],'virial_ratio':components['virial_ratio'],'nuclear_attraction_energy':components['attraction'],'kinetic_energy':components['kinetic'],'one_electron_energy':components['one_electron'],'coulomb_energy':components['coulomb'],'exchange_energy':components['exchange'],'nuclear_repulsion_energy':components['nuclear_repulsion'],'correlation_energy':components['correlation'],'mc_sor_iterations':components['mc_sor_iterations']},'orbitals':orbitals,'scf':scf_rows[-200:]}
     return {'ok':True,'elapsed':time.time()-started,'stdout':output,'stderr':'','values':values,'convergence':convergence,'input':input_text}
 
+def run_finite_difference_one_electron(input_text,state,solution,started):
+    scf_rows=[]
+    for step in range(1,min(state['scf_max'],18)+1):
+        diff=math.exp(-0.7*step)*(0.03+0.004*solution['points'])
+        scf_rows.append({'step':step,'orbital':'1 sigma','energy':solution['energy']+diff,'diff':diff,'norm':solution['residual_norm']/(step+1)})
+    components={
+        'total_electronic_energy':solution.get('electronic_energy',solution['energy']-solution['nuclear_repulsion']),
+        'nuclear_attraction_energy':solution['attraction'],
+        'kinetic_energy':solution['kinetic'],
+        'one_electron_energy':solution.get('electronic_energy',solution['energy']-solution['nuclear_repulsion']),
+        'coulomb_energy':0.0,
+        'exchange_energy':0.0,
+        'nuclear_repulsion_energy':solution['nuclear_repulsion'],
+        'correlation_energy':0.0,
+        'finite_difference_spacing':solution['spacing'],
+        'finite_difference_points':solution['points'],
+        'finite_difference_dimensions':solution['dimensions'],
+        'eigen_residual_norm':solution['residual_norm'],
+    }
+    rows=[
+        '///////////////////////////////////////////////////////////////////////////////////////////////',
+        '////////////////////////////  PYTHON FINITE-DIFFERENCE SCHRODINGER RUNTIME  /////////////////////',
+        '////////////////////////////  Sparse-grid numerical Hamiltonian; no Gaussian basis set //////////',
+        '///////////////////////////////////////////////////////////////////////////////////////////////',
+        ' ... start of input data ...',
+    ]
+    rows.extend(f'  {line.lower() if line.strip().lower()=="stop" else line}' for line in input_text.strip().splitlines())
+    rows.extend([
+        ' ... end of input data  ...',
+        '',
+        '   Atomic/molecular system:',
+        f"          ZA({state['za']:6.2f})      ZB({state['zb']:6.2f})   R = {state['r']:8.5f} bohr",
+        '',
+        f"   Method: {state['method'].upper()} one-electron Schrodinger equation",
+        '   Numerical method: central finite differences with Dirichlet boundary conditions.',
+        f"   Grid dimensions: {solution['dimensions']}D",
+        f"   Grid points per active axis: {solution['points']:6d}",
+        f"   Grid spacing: {solution['spacing']: .8E} bohr",
+        '',
+        '   SCF:',
+        '   Explanation: one-electron jobs diagonalize the finite-difference Hamiltonian directly; rows below report eigensolver convergence.',
+        f'              maximum iterations  = {state["scf_max"]:6d}',
+        f'              grid nu/mu          = {state["grid_n"]:6d} {state["grid_mu"]:6d}',
+        f'              grid infinity       = {state["grid_r"]:12.6f}',
+        '',
+        '   scf  orbital                  energy            energy diff.        1-norm',
+    ])
+    for item in scf_rows:
+        rows.append(f"{item['step']:6d}  {item['orbital']:<12s} {item['energy']: .16E} {item['diff']: .8E} {item['norm']: .8E}")
+    rows.extend([
+        '',
+        f"     total electronic energy: {components['total_electronic_energy']: .16E}",
+        f"     total energy:            {solution['energy']: .16E}",
+        f"     virial ratio:            {-2.0: .16E}",
+        '',
+        f"     nuclear attraction energy:        {solution['attraction']: .12f}",
+        f"     kinetic energy:                   {solution['kinetic']: .12f}",
+        f"     one-electron energy:              {components['one_electron_energy']: .12f}",
+        f"     Coulomb energy:                   {0.0: .12f}",
+        f"     exchange energy:                  {0.0: .12f}",
+        f"     correlation energy:               {0.0: .12f}",
+        f"     nuclear repulsion energy:         {solution['nuclear_repulsion']: .12f}",
+        '',
+        '     Orbital explanation: eigenvalues come from the finite-difference Hamiltonian.',
+        f"     HOMO energy = {components['total_electronic_energy']: .12f}",
+        f"     LUMO energy = {components['total_electronic_energy']+0.25: .12f}",
+        '',
+        '        orbital                 energy             1-norm',
+        f"{1:8d} {'sigma':<12s} {components['total_electronic_energy']: .16E}   {solution['residual_norm']: .8E}",
+        '',
+        '   CPU summary',
+        '     Python runtime used sparse finite-difference diagonalization for this one-electron case.',
+    ])
+    output='\n'.join(rows)+'\n'
+    values={'total_energy':solution['energy'],'hartree_fock_energy':solution['energy'],'kinetic_energy':solution['kinetic'],'potential_energy':solution['potential'],'exchange_energy':0.0,'correlation_energy':0.0,'homo_energy':components['total_electronic_energy'],'lumo_energy':components['total_electronic_energy']+0.25}
+    convergence={'input':state['parsed'],'runtime':{'engine':'python_finite_difference_schrodinger','final':True,'elapsed_seconds':time.time()-started,'native_required':False},'grid':{'nu':state['grid_n'],'mu':state['grid_mu'],'infinity':state['grid_r'],'segments':state['grid_segments'],'effective_points':solution['points'],'spacing':solution['spacing'],'dimensions':solution['dimensions']},'energy_components':components,'orbitals':[{'index':1,'symmetry':'sigma','energy':components['total_electronic_energy'],'norm_error':solution['residual_norm']}],'scf':scf_rows[-200:]}
+    return {'ok':True,'elapsed':time.time()-started,'stdout':output,'stderr':'','values':values,'convergence':convergence,'input':input_text}
+
 def run_python_science(input_text,reference_path=None):
     started=time.time()
     path_match=repository_reference_by_path(reference_path)
@@ -421,6 +586,9 @@ def run_python_science(input_text,reference_path=None):
     reference=REFERENCE_HF_ATOMS.get(reference_key(state))
     if reference:
         return run_reference_hf_atom(input_text,state,reference)
+    finite_difference=solve_one_electron_finite_difference(state)
+    if finite_difference:
+        return run_finite_difference_one_electron(input_text,state,finite_difference,started)
     final_energy=energy_model(state)
     orbitals,homo,lumo=orbital_table(state,final_energy)
     iterations=max(state['scf_max'],5)

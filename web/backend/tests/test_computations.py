@@ -87,7 +87,18 @@ def test_python_science_runtime_accepts_fifty_lakh_iterations():
     result=run_python_science(text)
     assert result['ok'] is True
     assert 'maximum iterations  = 5000000' in result['stdout']
-    assert result['convergence']['runtime']['engine']=='python_science'
+    assert result['convergence']['runtime']['engine']=='python_finite_difference_schrodinger'
+    assert 'Sparse-grid numerical Hamiltonian; no Gaussian basis set' in result['stdout']
+
+def test_python_runtime_solves_one_electron_diatomic_with_finite_difference():
+    from computations.python_runtime import run_python_science
+    text='title H2+ FD\nmethod hf\nnuclei 1.0 1.0 2.0\nconfig 1\n 1 sigma + end\ngrid 27 18.0\norbpot hydrogen\nscf 20 10 12 16 3\nstop'
+    result=run_python_science(text)
+    assert result['ok'] is True
+    assert result['convergence']['runtime']['engine']=='python_finite_difference_schrodinger'
+    assert result['convergence']['grid']['dimensions']==3
+    assert result['values']['total_energy']<0.0
+    assert 'PYTHON SURROGATE SCIENCE RUNTIME' not in result['stdout']
 
 def test_python_runtime_reproduces_predefined_h_reference():
     from computations.python_runtime import run_python_science

@@ -1,0 +1,5 @@
+{
+  "theme": "laboratory",
+  "title": "Quantum Runtime Dashboard",
+  "subtitle": "Live telemetry for native X2DHF finite-difference jobs, SCF convergence, stored results, and molecule experiments."
+}

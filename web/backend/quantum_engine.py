@@ -1,354 +1,177 @@
-import numpy as np
-from scipy.special import erf,gamma
-from scipy.integrate import quad
-from scipy.linalg import eigh,eigh_tridiagonal
-from typing import Tuple,Dict,List
+import math
 import warnings
-warnings.filterwarnings('ignore')
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
-class GaussianBasisFunction:
-    """Gaussian basis function implementation"""
-    def __init__(self,center:np.ndarray,exponent:float,l:int=0,m:int=0,n:int=0):
-        self.center=center
-        self.exponent=exponent
-        self.l,self.m,self.n=l,m,n
-        self.norm=self._compute_normalization()
-    
-    def _compute_normalization(self)->float:
-        """Compute normalization constant for Gaussian basis function"""
-        factor=(2*self.exponent/np.pi)**0.75
-        l_fact,m_fact,n_fact=1,1,1
-        if self.l>0:l_fact=np.prod([2*i-1 for i in range(1,self.l+1)])
-        if self.m>0:m_fact=np.prod([2*i-1 for i in range(1,self.m+1)])
-        if self.n>0:n_fact=np.prod([2*i-1 for i in range(1,self.n+1)])
-        denom=np.sqrt(l_fact*m_fact*n_fact)
-        return float(factor/denom)
-    
-    def evaluate(self,r:np.ndarray)->float:
-        """Evaluate basis function at position r"""
-        dr=r-self.center
-        dist_sq=np.sum(dr**2)
-        exp_part=np.exp(-self.exponent*dist_sq)
-        x_part=dr[0]**self.l if self.l>0 else 1.0
-        y_part=dr[1]**self.m if self.m>0 else 1.0
-        z_part=dr[2]**self.n if self.n>0 else 1.0
-        return float(self.norm*x_part*y_part*z_part*exp_part)
+import numpy as np
+from scipy.sparse import diags, eye, kron
+from scipy.sparse.linalg import eigsh
+
+warnings.filterwarnings("ignore")
+
+
+@dataclass
+class FiniteDifferenceGrid:
+    """Uniform Dirichlet finite-difference grid."""
+
+    points: int = 301
+    extent: float = 35.0
+
+    def axis(self) -> Tuple[np.ndarray, float]:
+        points = max(int(self.points), 25)
+        extent = max(float(self.extent), 4.0)
+        axis = np.linspace(-extent, extent, points + 2)[1:-1]
+        return axis, float(axis[1] - axis[0])
+
+    def radial_axis(self) -> Tuple[np.ndarray, float]:
+        points = max(int(self.points), 101)
+        extent = max(float(self.extent), 20.0)
+        axis = np.linspace(0.0, extent, points + 2)[1:-1]
+        return axis, float(axis[1] - axis[0])
+
 
 class QuantumComputationEngine:
-    """Quantum computation engine implementing HF and DFT methods"""
-    
-    def __init__(self,geometry:np.ndarray,nuclear_charges:np.ndarray,basis_functions:List[GaussianBasisFunction]):
-        """
-        Initialize quantum engine
-        geometry: Nx3 array of atomic positions
-        nuclear_charges: N array of nuclear charges
-        basis_functions: List of GaussianBasisFunction objects
-        """
-        self.geometry=geometry
-        self.nuclear_charges=nuclear_charges
-        self.basis=basis_functions
-        self.nbasis=len(basis_functions)
-        self.converged=False
-        self.iteration_history=[]
-    
-    def compute_overlap_matrix(self)->np.ndarray:
-        """Compute overlap matrix S_ij"""
-        S=np.zeros((self.nbasis,self.nbasis))
-        for i in range(self.nbasis):
-            for j in range(i,self.nbasis):
-                S[i,j]=self._overlap_integral(i,j)
-                if i!=j:S[j,i]=S[i,j]
-        return S
-    
-    def _overlap_integral(self,i:int,j:int)->float:
-        """Compute overlap integral between basis functions i and j"""
-        gi,gj=self.basis[i],self.basis[j]
-        a,b=gi.exponent,gj.exponent
-        Ra,Rb=gi.center,gj.center
-        Rp=(a*Ra+b*Rb)/(a+b)
-        rab_sq=np.sum((Ra-Rb)**2)
-        exp_part=np.exp(-a*b*rab_sq/(a+b))
-        prefactor=(np.pi/(a+b))**1.5*gi.norm*gj.norm
-        
-        # Compute angular part (simplified for s-type orbitals)
-        angular=1.0
-        for l_i,l_j in zip([gi.l,gi.m,gi.n],[gj.l,gj.m,gj.n]):
-            if l_i==0 and l_j==0:continue
-            elif l_i==0 or l_j==0:angular*=0.5
-        
-        return float(prefactor*angular*exp_part)
-    
-    def compute_kinetic_matrix(self)->np.ndarray:
-        """Compute kinetic energy matrix T_ij"""
-        T=np.zeros((self.nbasis,self.nbasis))
-        for i in range(self.nbasis):
-            for j in range(i,self.nbasis):
-                T[i,j]=self._kinetic_integral(i,j)
-                if i!=j:T[j,i]=T[i,j]
-        return T
-    
-    def _kinetic_integral(self,i:int,j:int)->float:
-        """Compute kinetic energy integral"""
-        gi,gj=self.basis[i],self.basis[j]
-        a,b=gi.exponent,gj.exponent
-        Ra,Rb=gi.center,gj.center
-        rab_sq=np.sum((Ra-Rb)**2)
-        
-        # Simplified kinetic integral
-        overlap=self._overlap_integral(i,j)
-        term1=b*(2*(1+2*b)+1)*overlap
-        term2=-2*b**2*overlap
-        term3=-0.5*rab_sq*overlap
-        
-        return float(term1+term2+term3)
-    
-    def compute_nuclear_attraction_matrix(self)->np.ndarray:
-        """Compute nuclear attraction matrix V_ij"""
-        V=np.zeros((self.nbasis,self.nbasis))
-        for i in range(self.nbasis):
-            for j in range(i,self.nbasis):
-                V[i,j]=self._nuclear_attraction(i,j)
-                if i!=j:V[j,i]=V[i,j]
-        return V
-    
-    def _nuclear_attraction(self,i:int,j:int)->float:
-        """Compute nuclear attraction integral"""
-        integral=0.0
-        gi,gj=self.basis[i],self.basis[j]
-        a,b=gi.exponent,gj.exponent
-        Ra,Rb=gi.center,gj.center
-        Rp=(a*Ra+b*Rb)/(a+b)
-        
-        for k,Zk in enumerate(self.nuclear_charges):
-            Rk=self.geometry[k]
-            Rpk_sq=np.sum((Rp-Rk)**2)
-            rab_sq=np.sum((Ra-Rb)**2)
-            exp_part=np.exp(-a*b*rab_sq/(a+b))
-            T=float(a*b*Rpk_sq/(a+b))
-            
-            # Boys function approximation
-            boys_val=self._boys_function(0,T)
-            prefactor=2*np.pi/(a+b)*gi.norm*gj.norm*exp_part*boys_val
-            integral-=Zk*prefactor
-        
-        return float(integral)
-    
-    def _boys_function(self,n:int,T:float)->float:
-        """Compute Boys function F_n(T)"""
-        if T<1e-12:
-            return float(1.0/(2*n+1))
-        sqrt_T=np.sqrt(T)
-        if n==0:
-            return float(0.5*np.sqrt(np.pi/T)*erf(sqrt_T))
-        else:
-            return float(((2*n-1)*self._boys_function(n-1,T)-np.exp(-T))/(2*T))
-    
-    def compute_electron_repulsion_tensor(self)->np.ndarray:
-        """Compute electron repulsion integrals (ij|kl)"""
-        n=self.nbasis
-        eri=np.zeros((n,n,n,n))
-        for i in range(n):
-            for j in range(i+1):
-                for k in range(n):
-                    for l in range(k+1):
-                        eri[i,j,k,l]=self._eri_integral(i,j,k,l)
-                        eri[i,j,l,k]=eri[i,j,k,l]
-                        eri[j,i,k,l]=eri[i,j,k,l]
-                        eri[j,i,l,k]=eri[i,j,k,l]
-        return eri
-    
-    def _eri_integral(self,i:int,j:int,k:int,l:int)->float:
-        """Compute electron repulsion integral (ij|kl)"""
-        gi,gj,gk,gl=self.basis[i],self.basis[j],self.basis[k],self.basis[l]
-        a,b,c,d=gi.exponent,gj.exponent,gk.exponent,gl.exponent
-        Ra,Rb,Rc,Rd=gi.center,gj.center,gk.center,gl.center
-        
-        # Gaussian product centers
-        Rp=(a*Ra+b*Rb)/(a+b)
-        Rq=(c*Rc+d*Rd)/(c+d)
-        
-        rab_sq=np.sum((Ra-Rb)**2)
-        rcd_sq=np.sum((Rc-Rd)**2)
-        rpq_sq=np.sum((Rp-Rq)**2)
-        
-        eta=a*b/(a+b)
-        xi=c*d/(c+d)
-        
-        exp_part=np.exp(-eta*rab_sq-xi*rcd_sq)
-        T=float(eta*xi*rpq_sq/(eta+xi))
-        
-        boys_val=self._boys_function(0,T)
-        prefactor=2*np.pi**2.5/(a+b)/(c+d)/np.sqrt(a+b+c+d)
-        prefactor*=boys_val*gi.norm*gj.norm*gk.norm*gl.norm*exp_part
-        
-        return float(prefactor)
-    
-    def scf_iteration(self,C:np.ndarray,n_electrons:int,max_iter:int=50,threshold:float=1e-6)->Tuple[np.ndarray,float]:
-        """
-        Perform SCF iteration (Hartree-Fock)
-        C: Initial orbital coefficients
-        n_electrons: Number of electrons
-        """
-        S=self.compute_overlap_matrix()
-        T=self.compute_kinetic_matrix()
-        V=self.compute_nuclear_attraction_matrix()
-        H_core=T+V
-        
-        try:
-            S_inv_sqrt=np.linalg.inv(np.linalg.cholesky(S))
-        except:
-            evals,evecs=np.linalg.eigh(S)
-            S_inv_sqrt=evecs@np.diag(1.0/np.sqrt(np.maximum(evals,1e-10)))@evecs.T
-        
-        eri=self.compute_electron_repulsion_tensor()
-        n_occ=n_electrons//2
-        
-        energy_hist=[]
-        for iteration in range(max_iter):
-            # Build density matrix
-            C_occ=C[:,:n_occ]
-            P=2*C_occ@C_occ.T
-            
-            # Build Fock matrix
-            F=H_core.copy()
-            for i in range(self.nbasis):
-                for j in range(self.nbasis):
-                    for k in range(self.nbasis):
-                        for l in range(self.nbasis):
-                            F[i,j]+=P[k,l]*(eri[i,k,j,l]-0.5*eri[i,l,j,k])
-            
-            # Transform and diagonalize
-            F_ortho=S_inv_sqrt.T@F@S_inv_sqrt
-            evals,evecs_ortho=np.linalg.eigh(F_ortho)
-            C_new=S_inv_sqrt@evecs_ortho
-            
-            # Compute energy
-            energy=0.5*np.trace(P@(H_core+F))
-            energy_hist.append(energy)
-            self.iteration_history.append({'iteration':iteration+1,'energy':energy})
-            
-            # Check convergence
-            if iteration>0 and abs(energy_hist[-1]-energy_hist[-2])<threshold:
-                self.converged=True
-                return C_new,energy
-            
-            C=C_new
-        
-        return C,energy_hist[-1]
-    
-    def dft_iteration(self,C:np.ndarray,n_electrons:int,functional:str='LDA',max_iter:int=50)->Tuple[np.ndarray,float]:
-        """Perform DFT SCF iteration"""
-        S=self.compute_overlap_matrix()
-        T=self.compute_kinetic_matrix()
-        V=self.compute_nuclear_attraction_matrix()
-        H_core=T+V
-        
-        S_inv_sqrt=np.linalg.inv(np.linalg.cholesky(S))
-        
-        n_occ=n_electrons//2
-        energy_hist=[]
-        
-        for iteration in range(max_iter):
-            C_occ=C[:,:n_occ]
-            P=2*C_occ@C_occ.T
-            
-            # DFT potential (simplified LDA)
-            V_xc=self._compute_xc_potential(P,functional)
-            
-            # Build Kohn-Sham matrix
-            J=np.zeros((self.nbasis,self.nbasis))
-            eri=self.compute_electron_repulsion_tensor()
-            
-            for i in range(self.nbasis):
-                for j in range(self.nbasis):
-                    for k in range(self.nbasis):
-                        for l in range(self.nbasis):
-                            J[i,j]+=P[k,l]*eri[i,k,j,l]
-            
-            F=H_core+J+V_xc
-            F_ortho=S_inv_sqrt.T@F@S_inv_sqrt
-            evals,evecs_ortho=np.linalg.eigh(F_ortho)
-            C_new=S_inv_sqrt@evecs_ortho
-            
-            energy=0.5*np.trace(P@(H_core+F))
-            energy_hist.append(energy)
-            self.iteration_history.append({'iteration':iteration+1,'energy':energy,'method':'dft'})
-            
-            if iteration>0 and abs(energy_hist[-1]-energy_hist[-2])<1e-6:
-                self.converged=True
-                return C_new,energy
-            
-            C=C_new
-        
-        return C,energy_hist[-1]
-    
-    def _compute_xc_potential(self,P:np.ndarray,functional:str)->np.ndarray:
-        """Compute exchange-correlation potential"""
-        V_xc=np.zeros((self.nbasis,self.nbasis))
-        
-        # Simplified LDA/GGA approximation
-        factor=0.7 if functional=='LDA' else 0.8
-        for i in range(self.nbasis):
-            for j in range(self.nbasis):
-                V_xc[i,j]=factor*np.trace(P)/(self.nbasis**2)*P[i,j]
-        
-        return V_xc
-    
-    def compute_total_energy(self,C:np.ndarray,n_electrons:int)->float:
-        """Compute total energy from density"""
-        T=self.compute_kinetic_matrix()
-        V=self.compute_nuclear_attraction_matrix()
-        H_core=T+V
-        
-        C_occ=C[:,:n_electrons//2]
-        P=2*C_occ@C_occ.T
-        
-        E_one_electron=np.trace(P@H_core)
-        
-        # Two-electron energy
-        eri=self.compute_electron_repulsion_tensor()
-        E_two_electron=0
-        for i in range(self.nbasis):
-            for j in range(self.nbasis):
-                for k in range(self.nbasis):
-                    for l in range(self.nbasis):
-                        E_two_electron+=0.5*P[i,k]*P[j,l]*(eri[i,j,k,l]-0.5*eri[i,l,k,j])
-        
-        # Nuclear repulsion
-        E_nuc=0
+    """
+    Finite-difference one-electron Schrodinger solver.
+
+    This compatibility class intentionally does not use Gaussian or other finite
+    basis functions. Atomic one-electron systems are solved on a radial grid for
+    the reduced wavefunction u(r). Diatomic one-electron systems are solved on a
+    3D Cartesian finite-difference grid with sparse eigensolver diagonalization.
+    """
+
+    def __init__(
+        self,
+        geometry: np.ndarray,
+        nuclear_charges: np.ndarray,
+        basis_functions: Optional[List[object]] = None,
+        grid_points: int = 301,
+        grid_extent: float = 35.0,
+    ):
+        self.geometry = np.asarray(geometry, dtype=float)
+        self.nuclear_charges = np.asarray(nuclear_charges, dtype=float)
+        self.grid = FiniteDifferenceGrid(grid_points, grid_extent)
+        self.converged = False
+        self.iteration_history: List[Dict] = []
+        self.basis = []
+        self.nbasis = 0
+        if basis_functions:
+            warnings.warn(
+                "basis_functions is ignored; QuantumComputationEngine now uses finite differences.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+    def _nuclear_repulsion(self) -> float:
+        energy = 0.0
         for i in range(len(self.nuclear_charges)):
-            for j in range(i+1,len(self.nuclear_charges)):
-                Rij=np.linalg.norm(self.geometry[i]-self.geometry[j])
-                E_nuc+=self.nuclear_charges[i]*self.nuclear_charges[j]/Rij
-        
-        return float(E_one_electron+E_two_electron+E_nuc)
-    
-    def run_hartree_fock(self,n_electrons:int)->Dict:
-        """Run Hartree-Fock calculation"""
-        C=np.random.randn(self.nbasis,self.nbasis)
-        C,_=np.linalg.qr(C)
-        C_final,final_energy=self.scf_iteration(C,n_electrons)
-        
+            for j in range(i + 1, len(self.nuclear_charges)):
+                distance = np.linalg.norm(self.geometry[i] - self.geometry[j])
+                if distance > 1e-12:
+                    energy += self.nuclear_charges[i] * self.nuclear_charges[j] / distance
+        return float(energy)
+
+    def _solve_atomic(self) -> Dict:
+        charge = float(self.nuclear_charges[0])
+        r, dr = self.grid.radial_axis()
+        n = len(r)
+        main = np.full(n, 1.0 / dr**2) - charge / np.maximum(r, 1e-8)
+        off = np.full(n - 1, -0.5 / dr**2)
+        hamiltonian = diags([off, main, off], [-1, 0, 1], format="csr")
+        values, vectors = eigsh(hamiltonian, k=1, which="SA", tol=1e-10, maxiter=n * 20)
+        index = int(np.argmin(values))
+        energy = float(values[index])
+        residual = hamiltonian.dot(vectors[:, index]) - energy * vectors[:, index]
+        self.converged = True
+        self.iteration_history = [{"iteration": 1, "energy": energy, "residual_norm": float(np.linalg.norm(residual))}]
         return {
-            'converged':self.converged,
-            'final_energy':float(final_energy),
-            'iterations':len(self.iteration_history),
-            'orbital_energies':None,
-            'orbitals':C_final,
-            'iteration_history':self.iteration_history
+            "electronic_energy": energy,
+            "final_energy": energy,
+            "kinetic_energy": None,
+            "potential_energy": None,
+            "nuclear_repulsion_energy": 0.0,
+            "orbital_energies": [energy],
+            "residual_norm": float(np.linalg.norm(residual)),
+            "grid": {"dimensions": 1, "points": n, "spacing": dr, "extent": self.grid.extent},
         }
-    
-    def run_dft(self,n_electrons:int,functional:str='LDA')->Dict:
-        """Run DFT calculation"""
-        C=np.random.randn(self.nbasis,self.nbasis)
-        C,_=np.linalg.qr(C)
-        C_final,final_energy=self.dft_iteration(C,n_electrons,functional)
-        
+
+    def _solve_diatomic(self) -> Dict:
+        points = min(max(int(self.grid.points), 25), 45)
+        distance = float(np.linalg.norm(self.geometry[0] - self.geometry[1]))
+        half_box = max(min(float(self.grid.extent), 24.0), distance * 0.5 + 8.0)
+        axis, h = FiniteDifferenceGrid(points, half_box).axis()
+        lap1 = diags([np.ones(points - 1), -2.0 * np.ones(points), np.ones(points - 1)], [-1, 0, 1], format="csr") / (h * h)
+        ident = eye(points, format="csr")
+        laplacian = kron(kron(lap1, ident), ident) + kron(kron(ident, lap1), ident) + kron(kron(ident, ident), lap1)
+
+        x, y, z = np.meshgrid(axis, axis, axis, indexing="ij")
+        potential = np.zeros_like(x)
+        softening = 0.35 * h
+        for charge, center in zip(self.nuclear_charges, self.geometry):
+            dx = x - center[0]
+            dy = y - center[1]
+            dz = z - center[2]
+            potential -= charge / np.sqrt(dx * dx + dy * dy + dz * dz + softening * softening)
+
+        hamiltonian = (-0.5 * laplacian) + diags(potential.ravel(), 0, format="csr")
+        values, vectors = eigsh(hamiltonian, k=1, which="SA", tol=1e-8, maxiter=1200)
+        index = int(np.argmin(values))
+        electronic = float(values[index])
+        nuclear = self._nuclear_repulsion()
+        residual = hamiltonian.dot(vectors[:, index]) - electronic * vectors[:, index]
+        self.converged = True
+        self.iteration_history = [{"iteration": 1, "energy": electronic + nuclear, "residual_norm": float(np.linalg.norm(residual))}]
         return {
-            'converged':self.converged,
-            'final_energy':float(final_energy),
-            'iterations':len(self.iteration_history),
-            'functional':functional,
-            'orbitals':C_final,
-            'iteration_history':self.iteration_history
+            "electronic_energy": electronic,
+            "final_energy": electronic + nuclear,
+            "kinetic_energy": None,
+            "potential_energy": None,
+            "nuclear_repulsion_energy": nuclear,
+            "orbital_energies": [electronic],
+            "residual_norm": float(np.linalg.norm(residual)),
+            "grid": {"dimensions": 3, "points": points, "spacing": h, "extent": half_box},
         }
+
+    def solve_schrodinger(self, n_electrons: int = 1) -> Dict:
+        if int(n_electrons) != 1:
+            raise NotImplementedError("The Python finite-difference engine currently solves one-electron systems. Use native X2DHF for HF/DFT many-electron jobs.")
+        if len(self.nuclear_charges) == 1 or np.count_nonzero(np.abs(self.nuclear_charges) > 1e-12) == 1:
+            return self._solve_atomic()
+        if len(self.nuclear_charges) == 2:
+            return self._solve_diatomic()
+        raise NotImplementedError("Only one-electron atomic and diatomic finite-difference systems are supported.")
+
+    def run_hartree_fock(self, n_electrons: int) -> Dict:
+        result = self.solve_schrodinger(n_electrons)
+        return {
+            "converged": self.converged,
+            "final_energy": float(result["final_energy"]),
+            "iterations": len(self.iteration_history),
+            "orbital_energies": result["orbital_energies"],
+            "orbitals": None,
+            "iteration_history": self.iteration_history,
+            "grid": result["grid"],
+        }
+
+    def run_dft(self, n_electrons: int, functional: str = "LDA") -> Dict:
+        result = self.solve_schrodinger(n_electrons)
+        return {
+            "converged": self.converged,
+            "final_energy": float(result["final_energy"]),
+            "iterations": len(self.iteration_history),
+            "functional": functional,
+            "orbitals": None,
+            "orbital_energies": result["orbital_energies"],
+            "iteration_history": self.iteration_history,
+            "grid": result["grid"],
+        }
+
+    def compute_total_energy(self, _orbitals=None, n_electrons: int = 1) -> float:
+        return float(self.solve_schrodinger(n_electrons)["final_energy"])
+
+
+class GaussianBasisFunction:
+    """Deprecated compatibility stub; finite-difference grids replace basis functions."""
+
+    def __init__(self, *args, **kwargs):
+        raise RuntimeError("GaussianBasisFunction has been removed. Use QuantumComputationEngine with finite-difference grid settings.")

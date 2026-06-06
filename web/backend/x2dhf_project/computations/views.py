@@ -10,10 +10,12 @@ import os
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter,OrderingFilter
 from django.utils import timezone
+from django.http import HttpResponse
 from .models import MolecularSystem,Computation,ComputationParameter
 from .serializers import MolecularSystemSerializer,ComputationListSerializer,ComputationDetailSerializer,ComputationCreateSerializer
 from .tasks import run_computation_task
 from .science import parse_x2dhf_input,science_metadata
+from .test_sets import list_test_cases,read_test_case
 from .services import native_runtime_status,native_build_status,start_native_build
 from results.models import ComputationResult
 class MolecularSystemViewSet(viewsets.ModelViewSet):
@@ -59,9 +61,9 @@ class ComputationViewSet(viewsets.ModelViewSet):
             values=nuclei['values'] if nuclei else ['0','0','0']
             formula=f"ZA{values[0]}_ZB{values[1]}" if len(values)>=2 else parsed['title']
             molecular_system=MolecularSystem.objects.create(user=self.request.user,name=parsed['title'],description='Created from native X2DHF input',molecule_formula=formula,geometry_type='diatomic',symmetry='C_inf_v')
-        if settings.AUTO_START_COMPUTATIONS and not getattr(settings,'PYTHON_SCIENCE_RUNTIME',True) and not os.environ.get('PYTEST_CURRENT_TEST') and serializer.validated_data.get('theory')!='qe':
+        if settings.AUTO_START_COMPUTATIONS and not os.environ.get('PYTEST_CURRENT_TEST') and serializer.validated_data.get('theory')!='qe':
             native=native_runtime_status()
-            if not native.get('ready'):
+            if native.get('active_engine')=='unavailable':
                 raise ValidationError({'runtime':native.get('message'),'wsl':native.get('wsl'),'build_commands':native.get('build_commands')})
         serializer.validated_data.pop('parameters',None)
         computation=serializer.save(user=self.request.user,status='pending',molecular_system=molecular_system)
@@ -93,6 +95,17 @@ class ComputationViewSet(viewsets.ModelViewSet):
         computation=self.get_object()
         result=ComputationResult.objects.filter(computation=computation,user=request.user).first()
         return Response({'id':computation.id,'status':computation.status,'error_message':computation.error_message,'output_log':result.output_log if result else '','convergence_info':result.convergence_info if result else {},'updated_at':result.created_at if result else computation.updated_at})
+
+    @action(detail=True,methods=['get'])
+    def download_input(self,request,pk=None):
+        computation=self.get_object()
+        raw_input=computation.parameters.filter(key='x2dhf_input').values_list('value',flat=True).first()
+        if not raw_input:
+            return Response({'error':'No input deck stored for this computation'},status=status.HTTP_404_NOT_FOUND)
+        title=''.join(char if char.isalnum() or char in ('-','_') else '_' for char in computation.title).strip('_') or f'input_{computation.id}'
+        response=HttpResponse(raw_input,content_type='text/plain; charset=utf-8')
+        response['Content-Disposition']=f'attachment; filename="{title}_{computation.id}.data"'
+        return response
     @action(detail=False,methods=['get'])
     def statistics(self,request):
         computations=self.get_queryset()
@@ -102,6 +115,22 @@ class ComputationViewSet(viewsets.ModelViewSet):
     @action(detail=False,methods=['get'])
     def science(self,request):
         return Response(science_metadata())
+
+    @action(detail=False,methods=['get'])
+    def test_sets(self,request):
+        cases=list_test_cases()
+        query=str(request.query_params.get('q','')).strip().lower()
+        if query:
+            cases=[case for case in cases if query in case['name'].lower() or query in case['title'].lower()]
+        return Response({'count':len(cases),'results':cases})
+
+    @action(detail=False,methods=['get'])
+    def test_set(self,request):
+        path=request.query_params.get('path','')
+        try:
+            return Response(read_test_case(path))
+        except FileNotFoundError:
+            return Response({'error':'Test-set input file not found'},status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=False,methods=['get'])
     def native_status(self,request):

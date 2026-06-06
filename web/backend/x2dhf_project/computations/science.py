@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 from django.conf import settings
+from .test_sets import list_test_cases
 
 CARD_HELP={
     'title':{'meaning':'Case title written into output and data files.','format':'title text'},
@@ -133,11 +134,4 @@ THEORY_GUIDE={
 }
 
 def science_metadata():
-    tests=[]
-    root=Path(settings.X2DHF_DIRECTORY)/'test-sets'
-    if not root.is_absolute():
-        root=Path(settings.REPO_ROOT)/'test-sets'
-    for path in sorted(root.glob('*/*/input*.data')):
-        reference=path.with_name('reference.lst') if path.name=='input.data' else path.with_name(path.name.replace('input','reference').replace('.data','.lst'))
-        tests.append({'name':'/'.join(path.relative_to(root).parts),'path':str(path),'reference_path':'/'.join(reference.relative_to(root).parts) if reference.exists() else '','input':path.read_text(encoding='utf-8',errors='replace')})
-    return {'cards':CARD_HELP,'examples':EXAMPLES,'test_sets':tests,'theories':THEORY_GUIDE,'documents':[{'name':'X2DHF User Guide','url':'/api/core/docs/users-guide.pdf/'}]}
+    return {'cards':CARD_HELP,'examples':EXAMPLES,'test_sets':list_test_cases(),'theories':THEORY_GUIDE,'documents':[{'name':'X2DHF User Guide','url':'/api/core/docs/users-guide.pdf/'}]}

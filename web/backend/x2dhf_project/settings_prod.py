@@ -90,6 +90,9 @@ EMAIL_USE_TLS=os.environ.get('EMAIL_USE_TLS','True')=='True'
 EMAIL_HOST_USER=os.environ.get('EMAIL_HOST_USER','')
 EMAIL_HOST_PASSWORD=os.environ.get('EMAIL_HOST_PASSWORD','')
 AUTO_START_COMPUTATIONS=os.environ.get('AUTO_START_COMPUTATIONS','False')=='True'
+X2DHF_RUNTIME_MODE=os.environ.get('X2DHF_RUNTIME_MODE','auto').strip().lower()
+PYTHON_SCIENCE_RUNTIME=os.environ.get('PYTHON_SCIENCE_RUNTIME','True')=='True'
+USE_NATIVE_X2DHF=os.environ.get('USE_NATIVE_X2DHF','False')=='True'
 X2DHF_PATH=os.environ.get('X2DHF_PATH','/usr/local/bin/x2dhf')
 X2DHF_DFT_PATH=os.environ.get('X2DHF_DFT_PATH','/usr/local/bin/x2dhf_dft')
 QE_PATH=os.environ.get('QE_PATH','/usr/local/bin/pw.x')

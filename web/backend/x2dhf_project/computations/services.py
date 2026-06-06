@@ -36,6 +36,7 @@ COMPONENT_PATTERNS={
     'mc_sor_iterations':r'\(MC\)SOR iterations:\s*(\d+)',
 }
 NATIVE_BUILD_STATE={'running':False,'mode':'','exit_code':None,'error':''}
+NATIVE_BINARY_CANDIDATES=['x2dhf','x2dhf-s','x2dhf-s-lxc','x2dhf-lxc','x2dhf-openmp','x2dhf-openmp-lxc','x2dhf-pthread','x2dhf-pthread-lxc','x2dhf-tpool','x2dhf-tpool-lxc']
 
 def parameter_map(computation):
     return {item.key:item.value for item in computation.parameters.all()}
@@ -126,6 +127,25 @@ def x2dhf_root():
         return root
     return Path(getattr(settings,'REPO_ROOT',Path.cwd())).resolve()
 
+def runtime_mode():
+    mode=str(getattr(settings,'X2DHF_RUNTIME_MODE','auto')).strip().lower()
+    if mode not in {'auto','native','python'}:
+        mode='auto'
+    if getattr(settings,'USE_NATIVE_X2DHF',False):
+        mode='native'
+    return mode
+
+def executable_native_binaries(root=None):
+    root=root or x2dhf_root()
+    binaries=[]
+    for name in NATIVE_BINARY_CANDIDATES:
+        path=root/'bin'/name
+        if not path.exists():
+            continue
+        if platform.system().lower()=='windows' or os.access(path,os.X_OK):
+            binaries.append(name)
+    return binaries
+
 def wsl_status():
     if platform.system().lower()!='windows':
         return {'required':False,'available':False,'ready':True,'message':'Native Linux runtime'}
@@ -157,20 +177,36 @@ def native_source_summary():
 
 def native_runtime_status():
     root=x2dhf_root()
-    candidates=['x2dhf','x2dhf-s','x2dhf-s-lxc','x2dhf-lxc','x2dhf-openmp','x2dhf-openmp-lxc','x2dhf-pthread','x2dhf-pthread-lxc','x2dhf-tpool','x2dhf-tpool-lxc']
-    binaries=[name for name in candidates if (root/'bin'/name).exists()]
+    binaries=executable_native_binaries(root)
+    binary_files=[name for name in NATIVE_BINARY_CANDIDATES if (root/'bin'/name).exists()]
     wrapper=(root/'bin'/'xhf').exists()
     wsl=wsl_status()
-    ready=bool(binaries) and (platform.system().lower()!='windows' or wsl.get('ready'))
+    native_ready=bool(binaries) and (platform.system().lower()!='windows' or wsl.get('ready'))
+    mode=runtime_mode()
+    python_ready=bool(getattr(settings,'PYTHON_SCIENCE_RUNTIME',True))
+    active_engine='native_x2dhf' if (mode in {'auto','native'} and native_ready) else ('python_science' if python_ready and mode in {'auto','python'} else 'unavailable')
+    ready=active_engine!='unavailable'
     docker_path=shutil.which('docker')
+    if active_engine=='native_x2dhf':
+        message='Native X2DHF runtime is active'
+    elif active_engine=='python_science':
+        message='Python reference/finite-difference runtime is active; native X2DHF is not active'
+    elif mode=='native':
+        message='Native runtime was requested, but no executable X2DHF binary is available'
+    else:
+        message='No computation runtime is available'
     return {
         'ready':ready,
+        'native_ready':native_ready,
+        'active_engine':active_engine,
+        'runtime_mode':mode,
         'os':platform.system(),
         'root':str(root),
         'docker_available':bool(docker_path),
         'wrapper_present':wrapper,
         'compiled_binaries':binaries,
-        'missing_binaries':[] if binaries else candidates,
+        'binary_files':binary_files,
+        'missing_binaries':[] if binaries else NATIVE_BINARY_CANDIDATES,
         'wsl':wsl,
         'build_commands':{
             'install_wsl':'Run from Administrator PowerShell: wsl --install --no-distribution; restart if prompted; wsl --install -d Ubuntu; launch Ubuntu once.',
@@ -183,12 +219,12 @@ def native_runtime_status():
         },
         'sources':native_source_summary(),
         'python_runtime':{
-            'ready':bool(getattr(settings,'PYTHON_SCIENCE_RUNTIME',True)),
+            'ready':python_ready,
             'engine':'python_science',
-            'primary':not bool(getattr(settings,'USE_NATIVE_X2DHF',False)),
-            'message':'Python surrogate/reference replay is available only when USE_NATIVE_X2DHF=False.'
+            'primary':active_engine=='python_science',
+            'message':'Python reference replay and finite-difference fallback are available when runtime mode is auto/python and native is not active.'
         },
-        'message':'Native runtime ready' if ready else ('Native runtime is not ready. On Windows, install Ubuntu WSL, install Linux dependencies, then build X2DHF. Docker is optional.' if platform.system().lower()=='windows' else 'Native runtime is not ready: install Linux dependencies and build the Fortran/C binary into bin/.')
+        'message':message
     }
 
 def native_build_log_path():
@@ -266,17 +302,22 @@ def ensure_x2dhf_build():
     wsl=wsl_status()
     if platform.system().lower()=='windows' and not wsl.get('ready'):
         raise ValidationError(f"{wsl.get('message')}. Install a Linux distribution with `wsl --install -d Ubuntu`, then build X2DHF inside WSL.")
-    candidates=['x2dhf','x2dhf-s','x2dhf-s-lxc','x2dhf-lxc','x2dhf-openmp','x2dhf-openmp-lxc','x2dhf-pthread','x2dhf-pthread-lxc','x2dhf-tpool','x2dhf-tpool-lxc']
-    if any((root/'bin'/name).exists() for name in candidates):
+    if executable_native_binaries(root):
         return
-    raise ValidationError(f'Compiled X2DHF binary is missing. Build the Fortran code on Linux/WSL so one of {", ".join(candidates)} exists in {root / "bin"}.')
+    raise ValidationError(f'Compiled executable X2DHF binary is missing. Build the Fortran code on Linux/WSL so one of {", ".join(NATIVE_BINARY_CANDIDATES)} exists and is executable in {root / "bin"}.')
 
 def native_available():
-    root=x2dhf_root()
-    candidates=['x2dhf','x2dhf-s','x2dhf-s-lxc','x2dhf-lxc','x2dhf-openmp','x2dhf-openmp-lxc','x2dhf-pthread','x2dhf-pthread-lxc','x2dhf-tpool','x2dhf-tpool-lxc']
     if platform.system().lower()=='windows' and not wsl_status().get('ready'):
         return False
-    return any((root/'bin'/name).exists() for name in candidates)
+    return bool(executable_native_binaries())
+
+def should_use_python_runtime():
+    mode=runtime_mode()
+    if mode=='python':
+        return True
+    if mode=='native':
+        return False
+    return not native_available()
 
 def command_for(computation,input_path,output_path,workdir):
     if computation.theory=='qe':
@@ -348,7 +389,7 @@ def run_engine(computation):
     input_path=workdir/'input.in' if is_qe else workdir/'input.data'
     output_path=workdir/'output.out' if is_qe else workdir/'output.lst'
     input_path.write_text(build_qe_input(computation) if is_qe else build_x2dhf_input(computation),encoding='utf-8')
-    if not is_qe and getattr(settings,'PYTHON_SCIENCE_RUNTIME',True) and not getattr(settings,'USE_NATIVE_X2DHF',True):
+    if not is_qe and getattr(settings,'PYTHON_SCIENCE_RUNTIME',True) and should_use_python_runtime():
         params=parameter_map(computation)
         return run_python_science(input_path.read_text(encoding='utf-8'),reference_path=params.get('x2dhf_reference_path'))
     started=time.time()

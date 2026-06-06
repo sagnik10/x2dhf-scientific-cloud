@@ -28,7 +28,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ALLOWED_HOSTS: localhost,127.0.0.1,backend
-      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://frontend:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000
       X2DHF_DIRECTORY: /opt/x2dhf
       X2DHF_BINARY_PATH: /opt/x2dhf/bin/xhf
     ports:

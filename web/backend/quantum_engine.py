@@ -56,11 +56,7 @@ class QuantumComputationEngine:
         self.basis = []
         self.nbasis = 0
         if basis_functions:
-            warnings.warn(
-                "basis_functions is ignored; QuantumComputationEngine now uses finite differences.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
+            raise RuntimeError("basis_functions is not supported; QuantumComputationEngine uses finite-difference grids only.")
 
     def _nuclear_repulsion(self) -> float:
         energy = 0.0

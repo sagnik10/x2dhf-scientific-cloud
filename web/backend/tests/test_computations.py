@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 from django.contrib.auth.models import User
 from computations.models import MolecularSystem,Computation
 from computations.services import build_x2dhf_input,command_for,native_runtime_status,run_engine
@@ -99,6 +100,26 @@ def test_python_runtime_solves_one_electron_diatomic_with_finite_difference():
     assert result['convergence']['grid']['dimensions']==3
     assert result['values']['total_energy']<0.0
     assert 'PYTHON SURROGATE SCIENCE RUNTIME' not in result['stdout']
+
+def test_quantum_engine_rejects_basis_functions():
+    from quantum_engine import QuantumComputationEngine,GaussianBasisFunction
+    with pytest.raises(RuntimeError,match='GaussianBasisFunction has been removed'):
+        GaussianBasisFunction()
+    with pytest.raises(RuntimeError,match='finite-difference grids only'):
+        QuantumComputationEngine(np.array([[0.0,0.0,0.0]]),np.array([1.0]),basis_functions=[object()])
+
+def test_quantum_engine_one_electron_uses_finite_difference_grids():
+    from quantum_engine import QuantumComputationEngine
+    atom=QuantumComputationEngine(np.array([[0.0,0.0,0.0]]),np.array([1.0]),grid_points=151,grid_extent=35.0)
+    atom_result=atom.run_hartree_fock(1)
+    assert atom_result['grid']['dimensions']==1
+    assert atom_result['orbitals'] is None
+    assert atom.nbasis==0
+    molecule=QuantumComputationEngine(np.array([[0.0,0.0,-1.0],[0.0,0.0,1.0]]),np.array([1.0,1.0]),grid_points=27,grid_extent=18.0)
+    molecule_result=molecule.run_hartree_fock(1)
+    assert molecule_result['grid']['dimensions']==3
+    assert molecule_result['orbitals'] is None
+    assert molecule.nbasis==0
 
 def test_python_runtime_reproduces_predefined_h_reference():
     from computations.python_runtime import run_python_science

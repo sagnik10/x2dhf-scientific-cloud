@@ -195,6 +195,7 @@ def native_runtime_status():
         message='Native runtime was requested, but no executable X2DHF binary is available'
     else:
         message='No computation runtime is available'
+    linux_deps='if command -v dnf >/dev/null; then sudo dnf install -y gcc gcc-c++ gcc-gfortran make cmake blas-devel lapack-devel wget ca-certificates; elif command -v yum >/dev/null; then sudo yum install -y gcc gcc-c++ gcc-gfortran make cmake blas-devel lapack-devel wget ca-certificates; elif command -v apt-get >/dev/null; then sudo apt-get update && sudo apt-get install -y build-essential gfortran cmake make gcc g++ gawk bc libblas-dev liblapack-dev wget ca-certificates; fi'
     return {
         'ready':ready,
         'native_ready':native_ready,
@@ -210,7 +211,7 @@ def native_runtime_status():
         'wsl':wsl,
         'build_commands':{
             'install_wsl':'Run from Administrator PowerShell: wsl --install --no-distribution; restart if prompted; wsl --install -d Ubuntu; launch Ubuntu once.',
-            'install_deps':'apt-get update && apt-get install -y build-essential gfortran cmake make gcc g++ gawk bc libblas-dev liblapack-dev wget ca-certificates',
+            'install_deps':linux_deps,
             'basic':'./x2dhfctl -b',
             'libxc':'./x2dhfctl -L && ./x2dhfctl -b -l',
             'openmp_libxc':'./x2dhfctl -L && ./x2dhfctl -b -l -o',
@@ -242,14 +243,13 @@ def native_build_command(mode='basic'):
     if mode=='install_wsl':
         raise ValidationError('WSL/Ubuntu cannot be installed reliably from the website because Windows optional features, restarts, UAC, and BIOS virtualization may be required. Run `wsl --install --no-distribution` from Administrator PowerShell, restart if prompted, run `wsl --install -d Ubuntu`, launch Ubuntu once, then return here.')
     if mode=='install_deps':
-        packages='build-essential gfortran cmake make gcc g++ gawk bc libblas-dev liblapack-dev wget ca-certificates'
-        script=f'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y {packages}'
+        script='if command -v dnf >/dev/null; then dnf install -y gcc gcc-c++ gcc-gfortran make cmake blas-devel lapack-devel wget ca-certificates; elif command -v yum >/dev/null; then yum install -y gcc gcc-c++ gcc-gfortran make cmake blas-devel lapack-devel wget ca-certificates; elif command -v apt-get >/dev/null; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential gfortran cmake make gcc g++ gawk bc libblas-dev liblapack-dev wget ca-certificates; else echo "No supported package manager found"; exit 1; fi'
         if platform.system().lower()=='windows':
             status=wsl_status()
             if not status.get('ready'):
                 raise ValidationError(f"{status.get('message')}. Install Ubuntu WSL manually from Administrator PowerShell, launch Ubuntu once, then press Install Linux dependencies.")
             return ['wsl.exe','-u','root','bash','-lc',script]
-        return ['bash','-lc',f'command -v apt-get >/dev/null && sudo {script} || true']
+        return ['bash','-lc',f'sudo bash -lc {shlex.quote(script)}']
     script=commands.get(mode,commands['basic'])
     if platform.system().lower()=='windows':
         status=wsl_status()

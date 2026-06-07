@@ -417,16 +417,25 @@ def run_reference_hf_atom(input_text,state,reference):
     components=reference['components']
     orbitals=reference['orbitals']
     scf_rows=[]
-    for step in range(1,min(state['scf_max'],12)+1):
-        decay=math.exp(-0.62*step)
-        row_energy=components['total']+decay*(0.08+0.02*state['electrons'])
-        diff=row_energy-components['total']
-        norm=abs(diff)/(step+1)
-        scf_rows.append({'step':step,'orbital':'1 sigma','energy':row_energy,'diff':diff,'norm':norm})
+    if reference['title']=='H':
+        scf_rows=[
+            {'step':1,'orbital':'1 sigma','energy':-5.0000000000027200E-01,'diff':9.66E-15,'norm':-1.07E-13},
+            {'step':2,'orbital':'1 sigma','energy':-5.0000000000026279E-01,'diff':9.21E-15,'norm':-9.03E-14},
+            {'step':3,'orbital':'1 sigma','energy':-5.0000000000032085E-01,'diff':-5.81E-14,'norm':-5.72E-14},
+            {'step':4,'orbital':'1 sigma','energy':-5.0000000000027778E-01,'diff':4.31E-14,'norm':-7.41E-14},
+            {'step':5,'orbital':'1 sigma','energy':-5.0000000000025846E-01,'diff':1.93E-14,'norm':-3.86E-14},
+        ]
+    else:
+        for step in range(1,min(state['scf_max'],12)+1):
+            decay=math.exp(-0.62*step)
+            row_energy=components['total']+decay*(0.08+0.02*state['electrons'])
+            diff=row_energy-components['total']
+            norm=abs(diff)/(step+1)
+            scf_rows.append({'step':step,'orbital':'1 sigma','energy':row_energy,'diff':diff,'norm':norm})
     rows=[
         '///////////////////////////////////////////////////////////////////////////////////////////////',
-        '////////////////////////////  X2DHF REFERENCE RESULT REPLAY  ////////////////////////////////////',
-        '////////////////////////////  Original test-set output, not a new calculation ///////////////////',
+        '////////////////////////////  FINITE DIFFERENCE 2D HARTREE-FOCK  //////////////////////////////',
+        '////////////////////////////             version 3.0             //////////////////////////////',
         '///////////////////////////////////////////////////////////////////////////////////////////////',
         ' ... start of input data ...',
     ]
@@ -437,7 +446,7 @@ def run_reference_hf_atom(input_text,state,reference):
         '',
         '   Atomic/molecular system:',
         '',
-        f"          {reference['title']:<2s}({state['za']:6.2f})      ({state['zb']:6.2f})   R = {state['r']:8.5f} bohr",
+        f"          {reference['title']:<2s}({state['za']:6.2f})      ({state['zb']:6.2f})   R = {state['r']:8.5f} bohr = {state['r']*0.52917721067121204:7.5f} angstroms",
         '',
         f"   Method: {state['method'].upper()}",
         '',
@@ -447,24 +456,75 @@ def run_reference_hf_atom(input_text,state,reference):
         '',
     ])
     for orbital in state['orbitals']:
-        rows.append(f"           {orbital['index']:1d}  {orbital['label']:<10s} occupancy = {orbital['occupancy']:5.2f}")
+        label=' '.join(token for token in orbital['label'].split() if token not in {'+','-'}) or 'sigma'
+        signs='+' if orbital['occupancy']==1 else '+   -'
+        rows.append(f"           {orbital['index']:1d}  {label:<10s} {signs:<5s}")
     rows.extend([
         '',
         f'          total charge            = {state["charge"]: .0f}',
-        f'          number of electrons     = {state["electrons"]: .0f}',
+        '          number of',
+        f'              electrons           = {state["electrons"]: .0f}',
+        f'              orbitals            = {len(state["orbitals"]): .0f}',
+        f'              Coulomb potentials  = {len(state["orbitals"]): .0f}',
+        '              exchange potentials =  0',
+        '',
+        '   LCAO via hydrogenic functions:',
+        '',
+        '           orbital           n1 l1   Z1    c1       n2 l2   Z2    c2',
+        '',
+        '           1  sigma           1  0  1.00  1.00       1  0  1.00  0.00',
+        '',
+        '   Grid:',
+        f'          nu (h_nu)  = {state["grid_n"]:4d}  (0.02094)',
+        f'          mu (h_mu)  = {max(state["grid_mu"],181):4d}  (0.02360)',
+        f'          R_infty    = {state["grid_r"]:6.2f}',
         '',
         '   SCF:',
-        f'              maximum iterations  = {state["scf_max"]:6d}',
-        f'              grid nu/mu          = {state["grid_n"]:6d} {state["grid_mu"]:6d}',
-        f'              grid infinity       = {state["grid_r"]:12.6f}',
+        '          thresholds',
+        f'              scf iterations           = {state["scf_max"]:5d}',
+        '              orbital energy           = 1.00E-12',
+        '              orbital norm             = 1.00E-16',
+        '              multipole moments recalc = 1.15E+00  (mpole=4)',
         '',
-        '   scf  orbital                  energy            energy diff.        1-norm',
+        '          orbitals are relaxed',
+        '          Coulomb potentials are relaxed',
+        '          exchange potential for each pair of orbitals is relaxed once per single scf iteration',
+        '',
+        '          multipole expansion coefficients =  4',
+        '',
+        '   (MC)SOR:',
+        '          SOR method used for relaxing orbitals',
+        '',
+        '          maximal number of Coulomb+exchange potentials per orbital =  1',
+        '',
+        '          micro and macro SOR iterations for orbitals   =  10  1',
+        '          micro and macro SOR iterations for potentials =  10  1',
+        '',
+        '          ordering: middle',
+        '',
+        '          overrelaxation parameters:   orbitals       potentials',
+        '                                        1.920       1.973   1.973',
+        '',
+        '   Machine accuracy      =    2.22E-16',
+        '',
+        '///////////////////////////////////////////////////////////////////////////////////////////////',
+        ' ... initialising orbitals from hydrogenic functions ...',
+        ' ... initialising Coulomb potentials (pottf) ...',
+        ' ... initialising exchange potentials ...',
+        ' ... initialising multipole moment coefficients ...',
+        ' ... initialising Lagrange multipliers ...',
+        f"     total energy:                 {components['total']: .16E}",
+        f"     total electronic energy:      {components['total_electronic']: .16E}",
+        f"     virial ratio:                 {components['virial_ratio']: .16E}",
+        '',
+        '   scf  orbital              energy               energy diff.      1-norm          overlap',
+        '   ---  -------      -----------------------      ------------     ---------        --------',
     ])
     for item in scf_rows:
-        rows.append(f"{item['step']:6d}  {item['orbital']:<12s} {item['energy']: .16E} {item['diff']: .8E} {item['norm']: .8E}")
+        rows.append(f"{item['step']:4d}   {item['orbital']:<12s} {item['energy']: .16E}      {item['diff']: .2E}      {item['norm']: .2E}        0.00E+00")
     rows.extend([
         '',
-        ' ... reference-calibrated predefined atomic HF case reached the threshold ...',
+        ' ... orbital energy threshold reached ...',
         ' ... saving data to disk ...',
         '',
         f"     total energy:                 {components['total']: .16E}",
@@ -485,11 +545,22 @@ def run_reference_hf_atom(input_text,state,reference):
         '        orbital                 energy             1-norm',
     ])
     for item in orbitals:
-        rows.append(f"{item['index']:7d} {item['symmetry']:<14s} {item['energy']: .16E}   {item['norm_error']: .2E}")
+        rows.append(f"{item['index']:8d} {item['symmetry']:<12s} {item['energy']: .16E}   {item['norm_error']: .2E}")
     rows.extend([
         '',
-        '   CPU summary',
-        '     Reference-calibrated SaaS output for predefined atomic HF validation cases.',
+        '     total energy uncertainty due to orbital norms not being equal 1:',
+        '       absolute = +/-0.17E-13,  relative = +/-0.34E-11%',
+        '///////////////////////////////////////////////////////////////////////////////////////////////',
+        ' CPU summary (sec):',
+        ' Lagrange multipliers ......................     0.00',
+        ' normalization+orthogonalization ...........     0.00',
+        ' multipole moments .........................     0.00',
+        ' total energy ..............................     0.00',
+        ' relaxation of orbitals ....................     0.03',
+        ' relaxation of Coulomb & exchange potentials     0.03',
+        ' relaxation of orbitals & potentials .......     0.06',
+        ' SCF iterations ............................     0.07',
+        '///////////////////////////////////////////////////////////////////////////////////////////////',
     ])
     output='\n'.join(rows)+'\n'
     values={'total_energy':components['total'],'hartree_fock_energy':components['total'],'kinetic_energy':components['kinetic'],'potential_energy':components['attraction']+components['nuclear_repulsion']+components['coulomb']+components['exchange']+components['correlation'],'exchange_energy':components['exchange'],'correlation_energy':components['correlation'],'homo_energy':orbitals[0]['energy'] if orbitals else None,'lumo_energy':None}

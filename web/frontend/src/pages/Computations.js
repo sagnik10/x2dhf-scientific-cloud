@@ -30,11 +30,14 @@ const Computations=()=>{
  const [nativeStatus,setNativeStatus]=useState(null);
  const [nativeBuild,setNativeBuild]=useState(null);
  const [building,setBuilding]=useState(false);
+ const [showHistory,setShowHistory]=useState(false);
+ const [showRuntimeDetails,setShowRuntimeDetails]=useState(false);
  const isWindows=nativeStatus?.os==='Windows';
  const wslReady=!!nativeStatus?.wsl?.ready;
  const pythonReady=!!nativeStatus?.python_runtime?.ready;
  const nativeReady=!!nativeStatus?.native_ready;
  const runtimeReady=!!nativeStatus?.ready||pythonReady;
+ const showBuildLog=!!nativeBuild?.log&&(nativeBuild.build_running||nativeBuild.build_mode!=='install_wsl'||isWindows);
 
  const loadNative=()=>{
   computationAPI.getNativeStatus().then(response=>setNativeStatus(response.data)).catch(()=>setNativeStatus(null));
@@ -81,9 +84,9 @@ const Computations=()=>{
         <span>Sample inputs: {nativeStatus.sources?.inputs?.count||0}</span>
        </div>
       </div>
-      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${runtimeReady?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-amber-200 bg-amber-50 text-amber-700'}`}>{nativeReady?'native active':pythonReady?'python runtime active':'build required'}</span>
+      <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${runtimeReady?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-amber-200 bg-amber-50 text-amber-700'}`}>{nativeReady?'native active':pythonReady?'python runtime active':'build required'}</span><button type="button" onClick={()=>setShowRuntimeDetails(!showRuntimeDetails)} className="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">{showRuntimeDetails?'Hide details':'Details'}</button></div>
      </div>
-     {nativeStatus&&(
+     {nativeStatus&&showRuntimeDetails&&(
       <div className="mt-4 space-y-3">
        <div className={`rounded border p-3 text-sm ${runtimeReady?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>{nativeReady?'Jobs now run through the original X2DHF Fortran/C finite-difference engine on the server. Users only need the browser.':pythonReady?'Jobs can run now through the Python reference/replay runtime. Build native X2DHF later if you need the original Fortran/C solver for every case.':isWindows?'This Windows host needs a Linux runtime for the native solver. Use the setup buttons below, or deploy the app on a Linux/Docker server so all users can work from the browser.':'Build native X2DHF before submitting jobs. On a shared deployment this is done once in the Linux/Docker server image.'}</div>
        <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
@@ -102,21 +105,21 @@ const Computations=()=>{
         {!nativeStatus.docker_available&&<div className="mt-1 text-amber-100">Docker command skipped: docker is not installed or not on PATH.</div>}
        </div>
        {(nativeBuild?.error||nativeBuild?.build_error)&&<div className="whitespace-pre-wrap rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{nativeBuild.error||nativeBuild.build_error}</div>}
-       {nativeBuild?.log&&<pre className="max-h-56 overflow-auto rounded border border-slate-200 bg-slate-950 p-3 font-mono text-xs text-slate-100">{nativeBuild.log}</pre>}
+       {showBuildLog&&<pre className="max-h-56 overflow-auto rounded border border-slate-200 bg-slate-950 p-3 font-mono text-xs text-slate-100">{nativeBuild.log}</pre>}
       </div>
      )}
     </section>
    )}
 
    {showForm&&<ComputationForm systems={systems} nativeReady={runtimeReady} onSubmitted={submitComplete} onClose={()=>{setShowForm(false);dispatch(fetchComputations());}}/>}
-   <div className="flex flex-wrap gap-2">{['all','pending','running','completed','failed'].map(status=><button key={status} onClick={()=>changeFilter(status)} className={`rounded-lg border px-4 py-2 capitalize ${filterStatus===status?'border-cyan-500 bg-cyan-50 text-cyan-700':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>{status}</button>)}</div>
-   <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+   <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={()=>setShowHistory(!showHistory)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-950">{showHistory?'Hide previous runs':'Show previous runs'}</button>{showHistory&&['all','pending','running','completed','failed'].map(status=><button key={status} onClick={()=>changeFilter(status)} className={`rounded-lg border px-4 py-2 capitalize ${filterStatus===status?'border-cyan-500 bg-cyan-50 text-cyan-700':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>{status}</button>)}</div>
+   <div className={`grid grid-cols-1 gap-6 ${showHistory?'xl:grid-cols-[minmax(360px,0.8fr)_minmax(0,1.4fr)]':'xl:grid-cols-1'}`}>
+    {showHistory&&<section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
      <table className="w-full text-sm">
       <thead><tr className="bg-slate-100 text-slate-700"><th className="px-5 py-3 text-left">Title</th><th className="px-5 py-3 text-left">Theory</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-left">Created</th></tr></thead>
       <tbody>{filtered.length?filtered.map(c=><tr key={c.id} onClick={()=>{setSelected(c);setRuntime(null);}} className={`cursor-pointer border-t border-slate-200 hover:bg-cyan-50 ${selected?.id===c.id?'bg-cyan-50':''}`}><td className="px-5 py-3 font-semibold text-slate-950">{c.title}</td><td className="px-5 py-3 uppercase text-slate-600">{c.theory}</td><td className="px-5 py-3"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(c.status)}`}>{c.status}</span></td><td className="px-5 py-3 text-slate-500">{new Date(c.created_at).toLocaleString()}</td></tr>):<tr><td colSpan="4" className="px-5 py-10 text-center text-slate-500">No runs yet. Use the input runner above to load a sample or paste your own deck.</td></tr>}</tbody>
      </table>
-    </section>
+    </section>}
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
      <div className="mb-4 flex items-center justify-between">
       <div>
@@ -127,7 +130,7 @@ const Computations=()=>{
      </div>
      {current.error_message&&<div className="mb-3 whitespace-pre-wrap rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{Array.isArray(current.error_message)?current.error_message.join('\n'):current.error_message}</div>}
      {['pending','running'].includes(current.status)&&<div className="mb-3 rounded-lg border border-cyan-200 bg-cyan-50 p-4"><div className="flex items-center justify-between gap-3"><div><div className="font-semibold text-cyan-800">SCF engine active</div><div className="text-xs text-slate-600">Long 50 lakh iteration runs remain live here while representative convergence rows stream into output.</div></div><div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-200 border-t-cyan-500"/></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200"><div className="runtime-progress h-full rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-blue-500"/></div></div>}
-     <pre className="h-[560px] overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-emerald-100">{current.output_log||current.error_message||'No runtime output yet.'}</pre>
+     <pre className="h-[720px] overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-emerald-100">{current.output_log||current.error_message||'No runtime output yet.'}</pre>
     </section>
    </div>
   </div>

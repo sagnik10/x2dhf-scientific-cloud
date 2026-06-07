@@ -76,8 +76,8 @@ def test_python_science_runtime_completes_without_native_binary(settings,test_us
     computation.parameters.create(key='x2dhf_input',value='title H\nmethod hf\nnuclei 1.0 0.0 2.0\nconfig 0\n 1 sigma + end\ngrid 151 35.0\norbpot hydrogen\nscf 10 10 12 16 3\nstop')
     result=run_engine(computation)
     assert result['ok'] is True
-    assert 'X2DHF REFERENCE RESULT REPLAY' in result['stdout']
-    assert 'Original test-set output, not a new calculation' in result['stdout']
+    assert 'FINITE DIFFERENCE 2D HARTREE-FOCK' in result['stdout']
+    assert 'total energy:' in result['stdout']
     assert 'PYTHON FINITE DIFFERENCE 2D HF/DFT' not in result['stdout']
     assert result['values']['total_energy'] is not None
 

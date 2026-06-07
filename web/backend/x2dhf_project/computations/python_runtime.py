@@ -660,97 +660,17 @@ def run_python_science(input_text,reference_path=None):
     finite_difference=solve_one_electron_finite_difference(state)
     if finite_difference:
         return run_finite_difference_one_electron(input_text,state,finite_difference,started)
-    final_energy=energy_model(state)
-    orbitals,homo,lumo=orbital_table(state,final_energy)
-    iterations=max(state['scf_max'],5)
-    scf_rows=[]
-    for step in range(1,iterations+1):
-        row_energy=energy_model(state,step=step)['total']
-        diff=row_energy-final_energy['total']
-        norm=abs(diff)/(step+1)
-        scf_rows.append({'step':step,'orbital':orbitals[min(step-1,len(orbitals)-1)]['symmetry'],'energy':row_energy,'diff':diff,'norm':norm})
-        if abs(diff)<1e-8 and step>=5:
-            break
-    rows=[
+    message='Native X2DHF is required for this input. The Python runtime only replays repository reference cases or solves true one-electron finite-difference atomic/diatomic cases.'
+    output='\n'.join([
         '///////////////////////////////////////////////////////////////////////////////////////////////',
-        '////////////////////////////  PYTHON SURROGATE SCIENCE RUNTIME  /////////////////////////////////',
-        '////////////////////////////  Approximate model output; not native X2DHF ////////////////////////',
+        '////////////////////////////  NATIVE X2DHF REQUIRED  ///////////////////////////////////////////',
         '///////////////////////////////////////////////////////////////////////////////////////////////',
-        ' ... start of input data ...',
-    ]
-    rows.extend(f'  {line.lower() if line.strip().lower()=="stop" else line}' for line in input_text.strip().splitlines())
-    rows.extend([
-        ' ... end of input data  ...',
+        message,
         '',
-        '',
-        '   Atomic/molecular system: ',
-        '   Explanation: ZA and ZB are the nuclear charges on the two prolate-spheroidal centres.',
-        '   R is the internuclear separation used by the finite-difference runtime.',
-        '',
-        f"          ZA({state['za']:6.2f})      ZB({state['zb']:6.2f})   R = {state['r']:8.5f} bohr",
-        '',
-        f"   Method: {state['method'].upper()}",
-        f"   Explanation: {state['method'].upper()} selects the mean-field model. DFT/HFS modes add exchange-correlation terms from the functional card.",
-        '',
-        '   Nuclear potential: Coulomb',
-        '',
-        '   Electronic configuration:',
-        '   Explanation: Occupation cards define orbital symmetry and electron filling. The final card usually carries end.',
-        '',
-    ])
-    for orbital in state['orbitals']:
-        rows.append(f"           {orbital['index']:1d}  {orbital['label']:<10s} occupancy = {orbital['occupancy']:5.2f}")
-    rows.extend([
-        '',
-        f'          total charge            = {state["charge"]: .0f}',
-        f'          number of electrons     = {state["electrons"]: .0f}',
-        '',
-        '   SCF: ',
-        '   Explanation: SCF repeatedly updates orbitals and potentials until energy and norm changes are small.',
-        f'              maximum iterations  = {state["scf_max"]:6d}',
-        f'              grid segments       = {len(state["grid_segments"]):6d}',
-        f'              grid nu/mu          = {state["grid_n"]:6d} {state["grid_mu"]:6d}',
-        f'              grid infinity       = {state["grid_r"]:12.6f}',
-        '',
-        '   scf  orbital                  energy            energy diff.        1-norm',
-    ])
-    for item in scf_rows:
-        rows.append(f"{item['step']:6d}  {item['orbital']:<12s} {item['energy']: .16E} {item['diff']: .8E} {item['norm']: .8E}")
-    rows.extend([
-        '',
-        '     Energy explanation:',
-        '       total electronic energy excludes nuclear repulsion.',
-        '       total energy includes electronic terms and nuclear repulsion.',
-        '       kinetic, attraction, Coulomb, exchange, and correlation are stored separately.',
-        f"     total electronic energy: {final_energy['total_electronic']: .16E}",
-        f"     total energy:            {final_energy['total']: .16E}",
-        f"     virial ratio:            {-2.0: .16E}",
-        '',
-        f"     nuclear attraction energy:        {final_energy['attraction']: .12f}",
-        f"     kinetic energy:                   {final_energy['kinetic']: .12f}",
-        f"     one-electron energy:              {final_energy['kinetic']+final_energy['attraction']: .12f}",
-        f"     Coulomb energy:                   {final_energy['coulomb']: .12f}",
-        f"     exchange energy:                  {final_energy['exchange']: .12f}",
-        f"     correlation energy:               {final_energy['correlation']: .12f}",
-        f"     nuclear repulsion energy:         {final_energy['nuclear_repulsion']: .12f}",
-    ])
-    if state['method'] in ['dft','lda','hfs']:
-        rows.append(f"     Coulomb energy (DFT/LXC):         {final_energy['coulomb']: .12f}")
-        rows.append(f"     exchange energy (DFT/LXC):        {final_energy['exchange']+final_energy['correlation']: .12f}")
-    rows.extend([
-        '',
-        '     Orbital explanation: HOMO is the highest occupied molecular orbital, LUMO is the next available virtual orbital.',
-        f"     HOMO energy = {(homo or final_energy['total']/state['electrons']): .12f}",
-        f"     LUMO energy = {lumo: .12f}",
-        '',
-        '        orbital                 energy             1-norm',
-    ])
-    for item in orbitals:
-        rows.append(f"{item['index']:8d} {item['symmetry']:<12s} {item['energy']: .16E} {item['norm_error']: .8E}")
-    rows.extend(['','   CPU summary','     Python runtime wall time is reported by Django job metadata.','     Long SCF requests are streamed as representative convergence rows in the web console.'])
-    output='\n'.join(rows)+'\n'
-    values={'total_energy':final_energy['total'],'hartree_fock_energy':final_energy['total'],'kinetic_energy':final_energy['kinetic'],'potential_energy':final_energy['potential'],'exchange_energy':final_energy['exchange'],'correlation_energy':final_energy['correlation'],'homo_energy':homo,'lumo_energy':lumo}
-    convergence={'input':state['parsed'],'runtime':{'engine':'python_science','final':True,'elapsed_seconds':time.time()-started,'native_required':False},'grid':{'nu':state['grid_n'],'mu':state['grid_mu'],'infinity':state['grid_r'],'segments':state['grid_segments']},'energy_components':{'total_electronic_energy':final_energy['total_electronic'],'nuclear_attraction_energy':final_energy['attraction'],'kinetic_energy':final_energy['kinetic'],'one_electron_energy':final_energy['kinetic']+final_energy['attraction'],'coulomb_energy':final_energy['coulomb'],'exchange_energy':final_energy['exchange'],'nuclear_repulsion_energy':final_energy['nuclear_repulsion'],'correlation_energy':final_energy['correlation']},'orbitals':orbitals,'scf':scf_rows[-200:]}
-    return {'ok':True,'elapsed':time.time()-started,'stdout':output,'stderr':'','values':values,'convergence':convergence,'input':input_text}
+        'This job was not approximated by a Python surrogate.',
+        'Build or select the native X2DHF executable, or choose a repository reference/one-electron finite-difference case.',
+    ])+'\n'
+    convergence={'input':state['parsed'],'runtime':{'engine':'native_required','final':True,'elapsed_seconds':time.time()-started,'native_required':True},'grid':{'nu':state['grid_n'],'mu':state['grid_mu'],'infinity':state['grid_r'],'segments':state['grid_segments']},'energy_components':{},'orbitals':[],'scf':[]}
+    return {'ok':False,'elapsed':time.time()-started,'stdout':output,'stderr':message,'values':{},'convergence':convergence,'input':input_text}
 
 run_python_compat=run_python_science

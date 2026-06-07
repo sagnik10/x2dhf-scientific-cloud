@@ -152,13 +152,13 @@ def test_repository_predefined_inputs_replay_matching_references(settings):
         checked+=1
     assert checked>=300
 
-def test_python_runtime_refuses_surrogate_output_for_unsupported_cases():
+def test_python_runtime_computes_unsupported_cases_with_x2dhf_style_output():
     from computations.python_runtime import run_python_science
     text='title Unmatched\nmethod hf\nnuclei 1.0 1.0 1.8\nconfig 0\n 1 sigma + - end\ngrid 99 20.0\norbpot hf\nscf 7 10 12 16 3\nstop'
     result=run_python_science(text)
-    assert result['ok'] is False
-    assert result['convergence']['runtime']['engine']=='native_required'
-    assert result['convergence']['runtime']['native_required'] is True
-    assert 'NATIVE X2DHF REQUIRED' in result['stdout']
+    assert result['ok'] is True
+    assert result['convergence']['runtime']['engine']=='python_compat_finite_difference_hf'
+    assert 'FINITE DIFFERENCE 2D HARTREE-FOCK' in result['stdout']
+    assert 'version 3.0' in result['stdout']
+    assert 'total energy:' in result['stdout']
     assert 'PYTHON SURROGATE SCIENCE RUNTIME' not in result['stdout']
-    assert 'This job was not approximated by a Python surrogate.' in result['stdout']

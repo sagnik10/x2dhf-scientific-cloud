@@ -95,6 +95,7 @@ PYTHON_SCIENCE_RUNTIME=os.environ.get('PYTHON_SCIENCE_RUNTIME','True')=='True'
 USE_NATIVE_X2DHF=os.environ.get('USE_NATIVE_X2DHF','False')=='True'
 X2DHF_PATH=os.environ.get('X2DHF_PATH','/usr/local/bin/x2dhf')
 X2DHF_DFT_PATH=os.environ.get('X2DHF_DFT_PATH','/usr/local/bin/x2dhf_dft')
+X2DHF_REFERENCE_DIRS=os.environ.get('X2DHF_REFERENCE_DIRS','')
 QE_PATH=os.environ.get('QE_PATH','/usr/local/bin/pw.x')
 LIBXC_PATH=os.environ.get('LIBXC_PATH','/usr/local/lib')
 LOGGING={
